@@ -94,6 +94,11 @@ function createApp() {
     res.json({ ok: true });
   });
 
+  // ── Shared contacts ───────────────────────────────────────────────────
+  app.get('/api/shared-contacts', (req, res) => {
+    res.json(db.getAllSharedContacts());
+  });
+
   // ── Chat import ───────────────────────────────────────────────────────
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 

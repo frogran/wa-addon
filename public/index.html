@@ -254,9 +254,17 @@
 
   </div>
 
-  <!-- Contacts tab (placeholder) -->
+  <!-- Contacts tab -->
   <div id="tab-contacts" class="tab">
-    <p class="placeholder-tab">Contact intelligence coming in Phase 4.</p>
+    <div class="card">
+      <h3>Shared Contacts</h3>
+      <div class="msg-list" id="shared-contacts-list">
+        <p class="empty-state">No contacts have been shared yet.</p>
+      </div>
+    </div>
+    <p class="placeholder-tab" style="margin-top:12px">
+      Full contact intelligence (clusters, relationship summaries) coming in Phase 4.
+    </p>
   </div>
 
   <!-- Settings tab -->
@@ -318,6 +326,7 @@
       }
       if (name === 'tasks') refreshTasksList();
       if (name === 'settings') pollBackfillStatus();
+      if (name === 'contacts') refreshSharedContacts();
     }
 
     // ── Status polling ──────────────────────────────────────────────────
@@ -617,6 +626,41 @@
       } finally {
         btn.disabled = false;
       }
+    }
+
+    // ── Shared contacts ──────────────────────────────────────────────────
+    async function refreshSharedContacts() {
+      const list = document.getElementById('shared-contacts-list');
+      let rows;
+      try {
+        rows = await fetch('/api/shared-contacts').then(r => r.json());
+      } catch {
+        return;
+      }
+      if (!Array.isArray(rows)) return;
+      if (!rows.length) {
+        list.innerHTML = '<p class="empty-state">No contacts have been shared yet.</p>';
+        return;
+      }
+      list.innerHTML = rows.map(sc => {
+        const ctx = sc.context_before ? JSON.parse(sc.context_before) : [];
+        const ctxHtml = ctx.length
+          ? ctx.map(m => `<div class="snippet" dir="auto" style="border-left:2px solid #30363d;padding-left:6px;margin-top:4px">${escHtml(m)}</div>`).join('')
+          : '';
+        return `
+        <div class="msg-item" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <div style="display:flex;width:100%;align-items:center;gap:12px">
+            <div class="meta" style="flex:1">
+              <div class="to">${escHtml(sc.name || sc.phone)}</div>
+              <div class="body">${escHtml(sc.phone)}</div>
+            </div>
+            <div style="font-size:0.75em;color:#8b949e;white-space:nowrap">
+              from ${escHtml(sc.shared_by_name || sc.shared_by_phone)}
+            </div>
+          </div>
+          ${ctxHtml ? `<div style="font-size:0.78em;color:#8b949e;width:100%"><span style="color:#6e7681">Context:</span>${ctxHtml}</div>` : ''}
+        </div>`;
+      }).join('');
     }
 
     // ── Utilities ───────────────────────────────────────────────────────

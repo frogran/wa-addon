@@ -250,3 +250,31 @@ describe('import route', () => {
     expect(res.body.skipped).toBe(0);
   });
 });
+
+describe('shared contacts routes', () => {
+  let contactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+    contactId = db.upsertContact('+972501234567', 'Test Fan');
+  });
+
+  afterEach(() => db.close());
+
+  test('GET /api/shared-contacts returns empty array initially', async () => {
+    const res = await request(app).get('/api/shared-contacts');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  test('GET /api/shared-contacts returns shared contacts with shared_by_name', async () => {
+    db.createSharedContact('+972509999999', 'New Person', contactId);
+    const res = await request(app).get('/api/shared-contacts');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].phone).toBe('+972509999999');
+    expect(res.body[0].name).toBe('New Person');
+    expect(res.body[0].shared_by_name).toBe('Test Fan');
+  });
+});

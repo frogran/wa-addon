@@ -294,3 +294,49 @@ describe('settings helpers', () => {
     expect(db.getSetting('my_key')).toBe('second');
   });
 });
+
+// ── Backfill helpers ──────────────────────────────────────────────────────
+
+describe('backfill helpers', () => {
+  let contactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    contactId = db.upsertContact('+972501234567', 'Test Fan');
+  });
+
+  afterEach(() => db.close());
+
+  test('countInboundMessages counts only direction=in messages', () => {
+    db.insertMessage(contactId, 'in', 'Hello', 1700000001, 'wa-bf1');
+    db.insertMessage(contactId, 'in', 'Hi again', 1700000002, 'wa-bf2');
+    db.insertMessage(contactId, 'out', 'My reply', 1700000003, 'wa-bf3');
+    expect(db.countInboundMessages()).toBe(2);
+  });
+
+  test('getInboundMessagesAfter returns messages with id > afterId, joined with contact_name', () => {
+    const id1 = db.insertMessage(contactId, 'in', 'First', 1700000001, 'wa-bf4');
+    const id2 = db.insertMessage(contactId, 'in', 'Second', 1700000002, 'wa-bf5');
+    db.insertMessage(contactId, 'in', 'Third', 1700000003, 'wa-bf6');
+    const rows = db.getInboundMessagesAfter(id2, 10);
+    expect(rows.length).toBe(1);
+    expect(rows[0].body).toBe('Third');
+    expect(rows[0].contact_name).toBe('Test Fan');
+  });
+
+  test('getInboundMessagesAfter skips outbound messages', () => {
+    db.insertMessage(contactId, 'out', 'My reply', 1700000001, 'wa-bf7');
+    db.insertMessage(contactId, 'in', 'Inbound', 1700000002, 'wa-bf8');
+    const rows = db.getInboundMessagesAfter(0, 10);
+    expect(rows.length).toBe(1);
+    expect(rows[0].body).toBe('Inbound');
+  });
+
+  test('getLastMessagesFromContact returns bodies in chronological order', () => {
+    db.insertMessage(contactId, 'in', 'First msg', 1700000001, 'wa-bf9');
+    db.insertMessage(contactId, 'in', 'Second msg', 1700000002, 'wa-bf10');
+    db.insertMessage(contactId, 'in', 'Third msg', 1700000003, 'wa-bf11');
+    const bodies = db.getLastMessagesFromContact(contactId, 2);
+    expect(bodies).toEqual(['Second msg', 'Third msg']);
+  });
+});

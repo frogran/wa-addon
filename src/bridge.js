@@ -8,7 +8,10 @@ let currentQr = null;
 function init() {
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './data/.wwebjs_auth' }),
-    puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+    puppeteer: {
+      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
   });
 
   client.on('qr', (qr) => {

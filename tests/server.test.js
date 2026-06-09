@@ -198,3 +198,26 @@ describe('task routes', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('backfill routes', () => {
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+  });
+
+  afterEach(() => db.close());
+
+  test('GET /api/backfill/status returns idle by default', async () => {
+    const res = await request(app).get('/api/backfill/status');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('idle');
+    expect(res.body.processed).toBe(0);
+    expect(res.body.total).toBe(0);
+  });
+
+  test('POST /api/backfill returns ok', async () => {
+    const res = await request(app).post('/api/backfill');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+});

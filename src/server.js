@@ -3,6 +3,7 @@ const path = require('path');
 const qrcode = require('qrcode');
 const db = require('./db');
 const bridge = require('./bridge');
+const backfill = require('./backfill');
 
 function createApp() {
   const app = express();
@@ -70,6 +71,24 @@ function createApp() {
     }
     const changed = db.markTaskDone(Number(req.params.id));
     if (!changed) return res.status(404).json({ error: 'Task not found' });
+    res.json({ ok: true });
+  });
+
+  // ── Backfill ──────────────────────────────────────────────────────────
+  app.get('/api/backfill/status', (req, res) => {
+    res.json({
+      status: db.getSetting('backfill_status') || 'idle',
+      processed: parseInt(db.getSetting('backfill_processed') || '0', 10),
+      total: parseInt(db.getSetting('backfill_total') || '0', 10),
+    });
+  });
+
+  app.post('/api/backfill', (req, res) => {
+    const status = db.getSetting('backfill_status');
+    if (status === 'running') {
+      return res.status(409).json({ error: 'Backfill already running' });
+    }
+    backfill.run(null).catch(err => console.error('Backfill failed:', err.message));
     res.json({ ok: true });
   });
 

@@ -259,9 +259,46 @@
     <p class="placeholder-tab">Contact intelligence coming in Phase 4.</p>
   </div>
 
-  <!-- Settings tab (placeholder) -->
+  <!-- Settings tab -->
   <div id="tab-settings" class="tab">
-    <p class="placeholder-tab">Settings coming soon.</p>
+
+    <div class="card">
+      <h3>Message Backfill</h3>
+      <p style="font-size:0.85em;color:#8b949e;margin-bottom:14px">
+        Scan your WhatsApp history to extract tasks from past messages.
+      </p>
+      <button type="button" class="primary" id="backfill-btn" onclick="triggerBackfill()">Scan history</button>
+      <div id="backfill-status-text" style="margin-top:10px;font-size:0.85em;color:#8b949e"></div>
+      <div id="backfill-progress-wrap" style="display:none;margin-top:8px">
+        <div style="background:#21262d;border-radius:4px;height:6px">
+          <div id="backfill-bar" style="background:#58a6ff;border-radius:4px;height:6px;width:0%;transition:width 0.3s"></div>
+        </div>
+        <div id="backfill-counts" style="margin-top:4px;font-size:0.8em;color:#8b949e"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Import Chat Export</h3>
+      <p style="font-size:0.85em;color:#8b949e;margin-bottom:14px">
+        Export a chat from WhatsApp (Chat &gt; Export Chat &gt; Without Media) then upload the <em>_chat.txt</em> file here. After import, run "Scan history" above to extract tasks.
+      </p>
+      <div class="form-row">
+        <label for="import-user-name">Your display name in this chat</label>
+        <input type="text" id="import-user-name" placeholder="e.g. John Doe (leave blank if unknown)">
+      </div>
+      <div class="form-row">
+        <label for="import-contact-phone">Contact's phone number</label>
+        <input type="text" id="import-contact-phone" placeholder="e.g. +972501234567">
+      </div>
+      <div class="form-row">
+        <label for="import-file">Chat export file (_chat.txt)</label>
+        <input type="file" id="import-file" accept=".txt" style="color:#8b949e;padding:6px 0">
+      </div>
+      <button type="button" class="primary" id="import-btn" onclick="submitImport()">Import</button>
+      <div class="success-msg" id="import-success"></div>
+      <div class="error-msg" id="import-error"></div>
+    </div>
+
   </div>
 
   <script>
@@ -280,6 +317,7 @@
         if (!timeInput.value) timeInput.value = local;
       }
       if (name === 'tasks') refreshTasksList();
+      if (name === 'settings') pollBackfillStatus();
     }
 
     // ── Status polling ──────────────────────────────────────────────────
@@ -495,6 +533,91 @@
       }
       refreshTasksList();
     });
+
+    // ── Backfill ────────────────────────────────────────────────────────
+    let backfillPoller = null;
+
+    async function pollBackfillStatus() {
+      try {
+        const data = await fetch('/api/backfill/status').then(r => r.json());
+        updateBackfillUI(data);
+        if (data.status === 'running') startBackfillPolling();
+      } catch {}
+    }
+
+    async function triggerBackfill() {
+      const btn = document.getElementById('backfill-btn');
+      btn.disabled = true;
+      try {
+        await fetch('/api/backfill', { method: 'POST' });
+        startBackfillPolling();
+      } catch {
+        btn.disabled = false;
+      }
+    }
+
+    function startBackfillPolling() {
+      if (backfillPoller) clearInterval(backfillPoller);
+      backfillPoller = setInterval(async () => {
+        try {
+          const data = await fetch('/api/backfill/status').then(r => r.json());
+          updateBackfillUI(data);
+          if (data.status !== 'running') {
+            clearInterval(backfillPoller);
+            backfillPoller = null;
+            document.getElementById('backfill-btn').disabled = false;
+          }
+        } catch {}
+      }, 2000);
+    }
+
+    function updateBackfillUI(data) {
+      const labels = { idle: '', running: 'Scanning...', done: 'Done!', error: 'Error — check server logs.' };
+      document.getElementById('backfill-status-text').textContent = labels[data.status] || data.status;
+      const wrap = document.getElementById('backfill-progress-wrap');
+      if (data.status === 'running' || data.status === 'done') {
+        wrap.style.display = 'block';
+        const pct = data.total > 0 ? Math.round(data.processed / data.total * 100) : 0;
+        document.getElementById('backfill-bar').style.width = pct + '%';
+        document.getElementById('backfill-counts').textContent =
+          `${data.processed} / ${data.total} messages`;
+      }
+    }
+
+    // ── Import ───────────────────────────────────────────────────────────
+    async function submitImport() {
+      const file = document.getElementById('import-file').files[0];
+      const userName = document.getElementById('import-user-name').value.trim();
+      const contactPhone = document.getElementById('import-contact-phone').value.trim();
+      const successEl = document.getElementById('import-success');
+      const errorEl = document.getElementById('import-error');
+      successEl.style.display = 'none';
+      errorEl.style.display = 'none';
+
+      if (!file) { errorEl.textContent = 'Please select a file.'; errorEl.style.display = 'block'; return; }
+      if (!contactPhone) { errorEl.textContent = 'Please enter the contact\'s phone number.'; errorEl.style.display = 'block'; return; }
+
+      const btn = document.getElementById('import-btn');
+      btn.disabled = true;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('user_name', userName);
+      formData.append('contact_phone', contactPhone);
+
+      try {
+        const res = await fetch('/api/import', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Import failed');
+        successEl.textContent = `Imported ${data.imported} messages (${data.skipped} skipped). Run "Scan history" to extract tasks.`;
+        successEl.style.display = 'block';
+        document.getElementById('import-file').value = '';
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+      }
+    }
 
     // ── Utilities ───────────────────────────────────────────────────────
     function escHtml(str) {

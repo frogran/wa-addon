@@ -44,3 +44,9 @@ test('setStatus and getStatus round-trip', () => {
   db.setStatus('qr_pending');
   expect(db.getStatus()).toBe('qr_pending');
 });
+
+test('calling a helper before init throws a clear error', () => {
+  // db is closed by afterEach — simulate calling before init
+  db.close(); // ensure closed (safe to call when already null)
+  expect(() => db.getStatus()).toThrow('db not initialised');
+});

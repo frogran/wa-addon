@@ -4,7 +4,13 @@ const fs = require('fs');
 
 let db = null;
 
+function getDb() {
+  if (!db) throw new Error('db not initialised — call db.init() first');
+  return db;
+}
+
 function init(dbPath) {
+  if (db) throw new Error('db already initialised — call db.close() first');
   const resolved = dbPath || path.join(__dirname, '..', 'data', 'wa.db');
   if (resolved !== ':memory:') {
     const dir = path.dirname(resolved);
@@ -100,29 +106,29 @@ function close() {
 }
 
 function upsertContact(phone, name) {
-  const existing = db.prepare('SELECT id FROM contacts WHERE phone = ?').get(phone);
-  if (existing) {
-    db.prepare('UPDATE contacts SET name = ? WHERE id = ?').run(name, existing.id);
-    return existing.id;
-  }
-  const result = db.prepare('INSERT INTO contacts (phone, name) VALUES (?, ?)').run(phone, name);
-  return result.lastInsertRowid;
+  // Single atomic statement avoids a race between SELECT and INSERT/UPDATE
+  const row = getDb().prepare(`
+    INSERT INTO contacts (phone, name) VALUES (?, ?)
+    ON CONFLICT(phone) DO UPDATE SET name = excluded.name
+    RETURNING id
+  `).get(phone, name);
+  return row.id;
 }
 
 function insertMessage(contactId, direction, body, timestamp, waId) {
-  const result = db.prepare(
+  const result = getDb().prepare(
     'INSERT OR IGNORE INTO messages (contact_id, direction, body, timestamp, wa_id) VALUES (?, ?, ?, ?, ?)'
   ).run(contactId, direction, body, timestamp, waId);
   return result.changes === 0 ? null : result.lastInsertRowid;
 }
 
 function getStatus() {
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'bridge_status'").get();
+  const row = getDb().prepare("SELECT value FROM settings WHERE key = 'bridge_status'").get();
   return row ? row.value : 'disconnected';
 }
 
 function setStatus(status) {
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('bridge_status', ?)").run(status);
+  getDb().prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('bridge_status', ?)").run(status);
 }
 
 module.exports = { init, close, upsertContact, insertMessage, getStatus, setStatus };

@@ -1,17 +1,30 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const db = require('./db');
+const llm = require('./llm');
 
 let client = null;
 let currentQr = null;
+
+function parseVCardPhone(vcard) {
+  const waid = vcard.match(/waid=(\d+)/);
+  if (waid) return '+' + waid[1];
+  const tel = vcard.match(/TEL[^:]*:([+\d\s().-]+)/);
+  return tel ? tel[1].replace(/\s/g, '').trim() : null;
+}
+
+function parseVCardName(vcard) {
+  const m = vcard.match(/^FN:(.+)$/m);
+  return m ? m[1].trim() : null;
+}
 
 function init() {
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './data/.wwebjs_auth' }),
     puppeteer: {
       executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
   });
 
   client.on('qr', (qr) => {
@@ -37,8 +50,42 @@ function init() {
     if (msg.fromMe) return;
     try {
       const contact = await msg.getContact();
-      const contactId = db.upsertContact(msg.from, contact.pushname || contact.name || msg.from);
-      db.insertMessage(contactId, 'in', msg.body, Math.floor(msg.timestamp), msg.id.id);
+      const contactId = db.upsertContact(
+        msg.from,
+        contact.pushname || contact.name || msg.from
+      );
+
+      // Capture shared contacts (vCard messages)
+      if (msg.type === 'contact_card' || msg.type === 'vcard') {
+        const vcards = msg.vCards || [];
+        if (vcards.length) {
+          // Fetch the 2 most recent messages from this contact for context
+          const context = db.getLastMessagesFromContact(contactId, 2);
+          vcards.forEach((vcard) => {
+            const phone = parseVCardPhone(vcard);
+            const name = parseVCardName(vcard);
+            if (phone) db.createSharedContact(phone, name, contactId, null, context);
+          });
+        }
+        return;
+      }
+
+      if (!msg.body) return;
+
+      const msgId = db.insertMessage(
+        contactId,
+        'in',
+        msg.body,
+        Math.floor(msg.timestamp),
+        msg.id.id
+      );
+
+      if (msgId) {
+        // Fire task extraction async — non-blocking, failure is logged only
+        llm.extractTasks(msg.body)
+          .then((tasks) => tasks.forEach((body) => db.createTask(contactId, msgId, body)))
+          .catch((err) => console.error('Task extraction error:', err.message));
+      }
     } catch (err) {
       console.error('Error handling incoming message:', err.message);
     }
@@ -56,4 +103,9 @@ function getQr() {
   return currentQr;
 }
 
-module.exports = { init, sendMessage, getQr };
+function getChats() {
+  if (!client) throw new Error('WhatsApp client not initialized');
+  return client.getChats();
+}
+
+module.exports = { init, sendMessage, getQr, getChats };

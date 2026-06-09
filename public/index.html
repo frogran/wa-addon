@@ -300,9 +300,10 @@
     async function fetchContacts(q) {
       try {
         const contacts = await fetch(`/api/contacts?q=${encodeURIComponent(q)}`).then(r => r.json());
+        if (!Array.isArray(contacts)) { contactDropdown.classList.remove('open'); return; }
         contactDropdown.innerHTML = contacts.length
           ? contacts.map(c => `
-              <div class="contact-option" data-id="${c.id}" data-name="${escHtml(c.name || c.phone)}">
+              <div class="contact-option" data-id="${escHtml(String(c.id))}" data-name="${escHtml(c.name || c.phone)}">
                 ${escHtml(c.name || c.phone)}
                 <span class="phone">${escHtml(c.phone)}</span>
               </div>`).join('')
@@ -377,20 +378,26 @@
       } catch {
         return;
       }
+      if (!Array.isArray(rows)) return;
       if (!rows.length) {
         list.innerHTML = '<p class="empty-state">No scheduled messages.</p>';
         return;
       }
       list.innerHTML = rows.map(r => `
-        <div class="msg-item">
+        <div class="msg-item" data-msg-id="${escHtml(String(r.id))}">
           <div class="meta">
             <div class="to">To: ${escHtml(r.contact_name || r.contact_id)}</div>
             <div class="body" dir="auto">${escHtml(r.body)}</div>
           </div>
           <div class="time">${formatTime(r.send_at)}</div>
-          <button type="button" class="cancel-btn" onclick="cancelMessage(${r.id})">Cancel</button>
+          <button type="button" class="cancel-btn">Cancel</button>
         </div>`).join('');
     }
+
+    document.getElementById('schedule-list').addEventListener('click', e => {
+      const btn = e.target.closest('button.cancel-btn');
+      if (btn) cancelMessage(btn.closest('[data-msg-id]').dataset.msgId);
+    });
 
     async function cancelMessage(id) {
       try {

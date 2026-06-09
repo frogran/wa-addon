@@ -141,7 +141,9 @@ function createScheduledMessage(contactId, body, sendAt) {
 }
 
 function getScheduledMessage(id) {
-  return getDb().prepare('SELECT * FROM scheduled_messages WHERE id = ?').get(id);
+  return getDb().prepare(
+    'SELECT id, contact_id, body, send_at, status, error, attempt_count, created_at FROM scheduled_messages WHERE id = ?'
+  ).get(id);
 }
 
 function getDueScheduledMessages() {
@@ -156,7 +158,7 @@ function getDueScheduledMessages() {
 
 function getPendingScheduledMessages() {
   return getDb().prepare(`
-    SELECT sm.*, c.name AS contact_name
+    SELECT sm.*, c.phone, c.name AS contact_name
     FROM scheduled_messages sm
     JOIN contacts c ON c.id = sm.contact_id
     WHERE sm.status = 'pending'

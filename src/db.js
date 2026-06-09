@@ -184,6 +184,16 @@ function cancelScheduledMessage(id) {
   ).run(id);
 }
 
+function failScheduledMessage(id, error, maxAttempts) {
+  getDb().prepare(`
+    UPDATE scheduled_messages
+    SET attempt_count = attempt_count + 1,
+        status = CASE WHEN attempt_count + 1 >= ? THEN 'failed' ELSE status END,
+        error = ?
+    WHERE id = ?
+  `).run(maxAttempts, error, id);
+}
+
 // ── Contact helpers ───────────────────────────────────────────────────────
 
 function getAllContacts() {
@@ -204,6 +214,6 @@ module.exports = {
   upsertContact, insertMessage, getStatus, setStatus,
   createScheduledMessage, getScheduledMessage, getDueScheduledMessages,
   getPendingScheduledMessages, updateScheduledMessageStatus,
-  incrementAttemptCount, cancelScheduledMessage,
+  incrementAttemptCount, cancelScheduledMessage, failScheduledMessage,
   getAllContacts, searchContacts,
 };

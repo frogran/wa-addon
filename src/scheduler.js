@@ -10,11 +10,7 @@ async function tick(sendFn) {
       await sendFn(msg.phone, msg.body);
       db.updateScheduledMessageStatus(msg.id, 'sent');
     } catch (err) {
-      const newCount = msg.attempt_count + 1;
-      db.incrementAttemptCount(msg.id);
-      if (newCount >= MAX_ATTEMPTS) {
-        db.updateScheduledMessageStatus(msg.id, 'failed', err.message);
-      }
+      db.failScheduledMessage(msg.id, err.message, MAX_ATTEMPTS);
     }
   }
 }

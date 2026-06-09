@@ -155,6 +155,33 @@
     .placeholder-tab { color: #8b949e; font-size: 0.9em; padding-top: 8px; }
     .success-msg { color: #3fb950; font-size: 0.85em; margin-top: 8px; display: none; }
     .error-msg { color: #f85149; font-size: 0.85em; margin-top: 8px; display: none; }
+    /* Tasks tab */
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+    }
+    .task-item .meta { flex: 1; min-width: 0; }
+    .task-item .contact { font-size: 0.8em; color: #58a6ff; margin-bottom: 2px; }
+    .task-item .task-body { font-size: 0.9em; margin-bottom: 4px; }
+    .task-item .snippet { font-size: 0.78em; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    button.done-btn {
+      background: none;
+      border: 1px solid #238636;
+      color: #3fb950;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.78em;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    button.done-btn:hover { background: #1a4731; }
   </style>
 </head>
 <body>
@@ -181,9 +208,11 @@
     <p class="placeholder-tab">Inbox coming in Phase 5.</p>
   </div>
 
-  <!-- Tasks tab (placeholder) -->
+  <!-- Tasks tab -->
   <div id="tab-tasks" class="tab">
-    <p class="placeholder-tab">Task extraction coming in Phase 3.</p>
+    <div class="msg-list" id="tasks-list">
+      <p class="empty-state">No pending tasks.</p>
+    </div>
   </div>
 
   <!-- Schedule tab -->
@@ -242,7 +271,15 @@
       document.querySelectorAll('nav a').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
       document.querySelector(`nav a[data-tab="${name}"]`).classList.add('active');
-      if (name === 'schedule') refreshScheduleList();
+      if (name === 'schedule') {
+        refreshScheduleList();
+        const timeInput = document.getElementById('schedule-time');
+        const now = new Date(Date.now() + 5 * 60 * 1000);
+        const local = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        timeInput.min = local;
+        if (!timeInput.value) timeInput.value = local;
+      }
+      if (name === 'tasks') refreshTasksList();
     }
 
     // ── Status polling ──────────────────────────────────────────────────
@@ -417,6 +454,47 @@
       const scheduleTab = document.getElementById('tab-schedule');
       if (scheduleTab.classList.contains('active')) refreshScheduleList();
     }, 30000);
+
+    // ── Tasks list ──────────────────────────────────────────────────────
+    async function refreshTasksList() {
+      const list = document.getElementById('tasks-list');
+      let rows;
+      try {
+        rows = await fetch('/api/tasks').then(r => r.json());
+      } catch {
+        return;
+      }
+      if (!Array.isArray(rows)) return;
+      if (!rows.length) {
+        list.innerHTML = '<p class="empty-state">No pending tasks.</p>';
+        return;
+      }
+      list.innerHTML = rows.map(t => `
+        <div class="task-item" data-task-id="${escHtml(String(t.id))}">
+          <div class="meta">
+            <div class="contact">${escHtml(t.contact_name || 'Unknown')}</div>
+            <div class="task-body" dir="auto">${escHtml(t.body)}</div>
+            <div class="snippet" dir="auto">${escHtml(t.message_snippet || '')}</div>
+          </div>
+          <button type="button" class="done-btn">Done</button>
+        </div>`).join('');
+    }
+
+    document.getElementById('tasks-list').addEventListener('click', async e => {
+      const btn = e.target.closest('button.done-btn');
+      if (!btn) return;
+      const id = btn.closest('[data-task-id]').dataset.taskId;
+      try {
+        await fetch(`/api/tasks/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'done' }),
+        });
+      } catch (e) {
+        console.warn('Failed to mark task done:', e.message);
+      }
+      refreshTasksList();
+    });
 
     // ── Utilities ───────────────────────────────────────────────────────
     function escHtml(str) {

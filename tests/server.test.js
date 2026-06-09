@@ -144,3 +144,57 @@ describe('contact routes', () => {
     expect(res.body[0].name).toBe('Alice Press');
   });
 });
+
+describe('task routes', () => {
+  let contactId, messageId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+    contactId = db.upsertContact('+972501234567', 'Test Fan');
+    messageId = db.insertMessage(contactId, 'in', 'Please call me back', 1700000000, 'wa-task1');
+  });
+
+  afterEach(() => db.close());
+
+  test('GET /api/tasks returns empty array initially', async () => {
+    const res = await request(app).get('/api/tasks');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  test('GET /api/tasks returns pending tasks with contact name', async () => {
+    db.createTask(contactId, messageId, 'Call back');
+    const res = await request(app).get('/api/tasks');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].body).toBe('Call back');
+    expect(res.body[0].contact_name).toBe('Test Fan');
+    expect(res.body[0].message_snippet).toBe('Please call me back');
+  });
+
+  test('PATCH /api/tasks/:id marks task done', async () => {
+    const id = db.createTask(contactId, messageId, 'Call back');
+    const res = await request(app)
+      .patch(`/api/tasks/${id}`)
+      .send({ status: 'done' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(db.getPendingTasks()).toHaveLength(0);
+  });
+
+  test('PATCH /api/tasks/:id returns 400 for invalid status', async () => {
+    const id = db.createTask(contactId, messageId, 'Call back');
+    const res = await request(app)
+      .patch(`/api/tasks/${id}`)
+      .send({ status: 'invalid' });
+    expect(res.status).toBe(400);
+  });
+
+  test('PATCH /api/tasks/:id returns 404 for non-existent id', async () => {
+    const res = await request(app)
+      .patch('/api/tasks/9999')
+      .send({ status: 'done' });
+    expect(res.status).toBe(404);
+  });
+});

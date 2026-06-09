@@ -58,6 +58,21 @@ function createApp() {
     res.json(contacts);
   });
 
+  // ── Tasks ─────────────────────────────────────────────────────────────
+  app.get('/api/tasks', (req, res) => {
+    res.json(db.getPendingTasks());
+  });
+
+  app.patch('/api/tasks/:id', (req, res) => {
+    const { status } = req.body;
+    if (status !== 'done') {
+      return res.status(400).json({ error: 'status must be "done"' });
+    }
+    const changed = db.markTaskDone(Number(req.params.id));
+    if (!changed) return res.status(404).json({ error: 'Task not found' });
+    res.json({ ok: true });
+  });
+
   return app;
 }
 

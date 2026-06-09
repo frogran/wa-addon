@@ -131,4 +131,77 @@ function setStatus(status) {
   getDb().prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('bridge_status', ?)").run(status);
 }
 
-module.exports = { init, close, upsertContact, insertMessage, getStatus, setStatus };
+// ── Scheduled message helpers ─────────────────────────────────────────────
+
+function createScheduledMessage(contactId, body, sendAt) {
+  const result = getDb().prepare(
+    'INSERT INTO scheduled_messages (contact_id, body, send_at) VALUES (?, ?, ?)'
+  ).run(contactId, body, sendAt);
+  return result.lastInsertRowid;
+}
+
+function getScheduledMessage(id) {
+  return getDb().prepare('SELECT * FROM scheduled_messages WHERE id = ?').get(id);
+}
+
+function getDueScheduledMessages() {
+  return getDb().prepare(`
+    SELECT sm.*, c.phone, c.name AS contact_name
+    FROM scheduled_messages sm
+    JOIN contacts c ON c.id = sm.contact_id
+    WHERE sm.send_at <= ? AND sm.status = 'pending' AND sm.attempt_count < 3
+    ORDER BY sm.send_at ASC
+  `).all(Math.floor(Date.now() / 1000));
+}
+
+function getPendingScheduledMessages() {
+  return getDb().prepare(`
+    SELECT sm.*, c.name AS contact_name
+    FROM scheduled_messages sm
+    JOIN contacts c ON c.id = sm.contact_id
+    WHERE sm.status = 'pending'
+    ORDER BY sm.send_at ASC
+  `).all();
+}
+
+function updateScheduledMessageStatus(id, status, error = null) {
+  getDb().prepare(
+    'UPDATE scheduled_messages SET status = ?, error = ? WHERE id = ?'
+  ).run(status, error, id);
+}
+
+function incrementAttemptCount(id) {
+  getDb().prepare(
+    'UPDATE scheduled_messages SET attempt_count = attempt_count + 1 WHERE id = ?'
+  ).run(id);
+}
+
+function cancelScheduledMessage(id) {
+  getDb().prepare(
+    "UPDATE scheduled_messages SET status = 'cancelled' WHERE id = ? AND status = 'pending'"
+  ).run(id);
+}
+
+// ── Contact helpers ───────────────────────────────────────────────────────
+
+function getAllContacts() {
+  return getDb().prepare(
+    'SELECT id, name, phone FROM contacts ORDER BY name ASC'
+  ).all();
+}
+
+function searchContacts(query) {
+  const like = `%${query}%`;
+  return getDb().prepare(
+    'SELECT id, name, phone FROM contacts WHERE name LIKE ? OR phone LIKE ? ORDER BY name ASC LIMIT 20'
+  ).all(like, like);
+}
+
+module.exports = {
+  init, close,
+  upsertContact, insertMessage, getStatus, setStatus,
+  createScheduledMessage, getScheduledMessage, getDueScheduledMessages,
+  getPendingScheduledMessages, updateScheduledMessageStatus,
+  incrementAttemptCount, cancelScheduledMessage,
+  getAllContacts, searchContacts,
+};

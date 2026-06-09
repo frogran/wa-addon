@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WA+ Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 24px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #21262d;
+    }
+    h1 { font-size: 1.2em; font-weight: 700; }
+    .badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge.connected    { background: #1a4731; color: #3fb950; }
+    .badge.qr_pending   { background: #3d2b00; color: #d29922; }
+    .badge.disconnected { background: #3d1515; color: #f85149; }
+    nav {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 32px;
+    }
+    nav a {
+      color: #8b949e;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.9em;
+      transition: background 0.1s, color 0.1s;
+    }
+    nav a:hover { background: #21262d; color: #e6edf3; }
+    #qr-section {
+      display: none;
+      margin-bottom: 24px;
+      padding: 20px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      text-align: center;
+      max-width: 320px;
+    }
+    #qr-section p { color: #8b949e; font-size: 0.85em; margin-bottom: 12px; }
+    #qr-img { width: 200px; height: 200px; }
+    #content { color: #8b949e; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WA+</h1>
+    <span id="status-badge" class="badge disconnected">Disconnected</span>
+  </header>
+
+  <nav>
+    <a href="#">Inbox</a>
+    <a href="#">Tasks</a>
+    <a href="#">Schedule</a>
+    <a href="#">Contacts</a>
+    <a href="#">Settings</a>
+  </nav>
+
+  <div id="qr-section">
+    <p>Open WhatsApp on your phone and scan this code</p>
+    <img id="qr-img" src="" alt="QR Code">
+  </div>
+
+  <div id="content">
+    Connecting to WhatsApp...
+  </div>
+
+  <script>
+    const badge = document.getElementById('status-badge');
+    const qrSection = document.getElementById('qr-section');
+    const qrImg = document.getElementById('qr-img');
+    const content = document.getElementById('content');
+
+    const labels = {
+      connected: 'Connected',
+      qr_pending: 'Scan QR',
+      disconnected: 'Disconnected'
+    };
+
+    async function pollStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        badge.className = 'badge ' + data.bridge_status;
+        badge.textContent = labels[data.bridge_status] || data.bridge_status;
+
+        if (data.bridge_status === 'qr_pending') {
+          const qrRes = await fetch('/api/qr');
+          const qrData = await qrRes.json();
+          if (qrData.qr) {
+            qrImg.src = qrData.qr;
+            qrSection.style.display = 'block';
+          }
+        } else {
+          qrSection.style.display = 'none';
+          if (data.bridge_status === 'connected') {
+            content.textContent = 'Connected. Dashboard features coming in later phases.';
+          }
+        }
+      } catch (e) {
+        badge.className = 'badge disconnected';
+        badge.textContent = 'Server offline';
+      }
+    }
+
+    pollStatus();
+    setInterval(pollStatus, 5000);
+  </script>
+</body>
+</html>

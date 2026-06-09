@@ -23,6 +23,32 @@ function createApp() {
     res.json({ qr: dataUrl });
   });
 
+  // ── Scheduled messages ────────────────────────────────────────────────
+  app.get('/api/scheduled', (req, res) => {
+    res.json(db.getPendingScheduledMessages());
+  });
+
+  app.post('/api/scheduled', (req, res) => {
+    const { contact_id, body, send_at } = req.body;
+    if (!contact_id || !body || !send_at) {
+      return res.status(400).json({ error: 'contact_id, body, and send_at are required' });
+    }
+    const id = db.createScheduledMessage(Number(contact_id), body, Number(send_at));
+    res.status(201).json({ id });
+  });
+
+  app.delete('/api/scheduled/:id', (req, res) => {
+    db.cancelScheduledMessage(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  // ── Contacts ──────────────────────────────────────────────────────────
+  app.get('/api/contacts', (req, res) => {
+    const { q } = req.query;
+    const contacts = q ? db.searchContacts(q) : db.getAllContacts();
+    res.json(contacts);
+  });
+
   return app;
 }
 

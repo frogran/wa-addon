@@ -44,6 +44,12 @@ describe('extractTasks', () => {
     expect(call.model).toBe('claude-opus-4-8');
     expect(call.system).toMatch(/task extraction/i);
   });
+
+  test('returns empty array when API call throws', async () => {
+    mockCreate.mockRejectedValue(new Error('rate limit'));
+    const tasks = await extractTasks('Call me back');
+    expect(tasks).toEqual([]);
+  });
 });
 
 describe('extractTasksBatch', () => {
@@ -78,5 +84,16 @@ describe('extractTasksBatch', () => {
     const msgs = [{ id: 99, contactName: 'Alice', body: 'Hello' }];
     const result = await extractTasksBatch(msgs);
     expect(result[99]).toEqual([]);
+  });
+
+  test('returns empty arrays for all ids when API call throws', async () => {
+    mockCreate.mockRejectedValue(new Error('network error'));
+    const msgs = [
+      { id: 10, contactName: 'Alice', body: 'Hello' },
+      { id: 11, contactName: 'Bob', body: 'Hi' },
+    ];
+    const result = await extractTasksBatch(msgs);
+    expect(result[10]).toEqual([]);
+    expect(result[11]).toEqual([]);
   });
 });

@@ -242,7 +242,7 @@ function markTaskDone(id) {
 function createSharedContact(phone, name, sharedBy, messageId = null, contextBefore = []) {
   const result = getDb().prepare(
     'INSERT OR IGNORE INTO shared_contacts (phone, name, shared_by, message_id, context_before) VALUES (?, ?, ?, ?, ?)'
-  ).run(phone, name, sharedBy, messageId, contextBefore.length ? JSON.stringify(contextBefore) : null);
+  ).run(phone, name, sharedBy, messageId, (contextBefore && contextBefore.length) ? JSON.stringify(contextBefore) : null);
   return result.changes === 0 ? null : result.lastInsertRowid;
 }
 

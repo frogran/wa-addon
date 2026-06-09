@@ -82,6 +82,19 @@ function init(dbPath) {
       created_at   INTEGER NOT NULL DEFAULT (unixepoch())
     );
 
+    CREATE TABLE IF NOT EXISTS shared_contacts (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone          TEXT NOT NULL,
+      name           TEXT,
+      shared_by      INTEGER NOT NULL REFERENCES contacts(id),
+      message_id     INTEGER REFERENCES messages(id),
+      context_before TEXT,
+      created_at     INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_contacts_phone ON shared_contacts(phone);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_message_body ON tasks(message_id, body);
+
     CREATE TABLE IF NOT EXISTS user_profile (
       id           INTEGER PRIMARY KEY CHECK(id = 1),
       global_style TEXT,
@@ -195,6 +208,91 @@ function failScheduledMessage(id, error, maxAttempts) {
   `).run(maxAttempts, error, id);
 }
 
+// ── Task helpers ──────────────────────────────────────────────────────────
+
+function createTask(contactId, messageId, body) {
+  const result = getDb().prepare(
+    'INSERT OR IGNORE INTO tasks (contact_id, message_id, body) VALUES (?, ?, ?)'
+  ).run(contactId, messageId, body);
+  return result.changes === 0 ? null : result.lastInsertRowid;
+}
+
+function getPendingTasks() {
+  return getDb().prepare(`
+    SELECT t.id, t.body, t.status, t.created_at,
+           c.name AS contact_name,
+           m.body AS message_snippet
+    FROM tasks t
+    JOIN contacts c ON c.id = t.contact_id
+    JOIN messages m ON m.id = t.message_id
+    WHERE t.status = 'pending'
+    ORDER BY t.created_at DESC
+  `).all();
+}
+
+function markTaskDone(id) {
+  const result = getDb().prepare(
+    "UPDATE tasks SET status = 'done' WHERE id = ? AND status = 'pending'"
+  ).run(id);
+  return result.changes;
+}
+
+// ── shared_contacts helpers ───────────────────────────────────────────────
+
+function createSharedContact(phone, name, sharedBy, messageId = null, contextBefore = []) {
+  const result = getDb().prepare(
+    'INSERT OR IGNORE INTO shared_contacts (phone, name, shared_by, message_id, context_before) VALUES (?, ?, ?, ?, ?)'
+  ).run(phone, name, sharedBy, messageId, contextBefore.length ? JSON.stringify(contextBefore) : null);
+  return result.changes === 0 ? null : result.lastInsertRowid;
+}
+
+function getLastMessagesFromContact(contactId, limit) {
+  return getDb().prepare(
+    "SELECT body FROM messages WHERE contact_id = ? AND direction = 'in' ORDER BY id DESC LIMIT ?"
+  ).all(contactId, limit).map(r => r.body).reverse();
+}
+
+function getAllSharedContacts() {
+  return getDb().prepare(`
+    SELECT sc.id, sc.phone, sc.name, sc.context_before, sc.created_at,
+           c.name AS shared_by_name, c.phone AS shared_by_phone
+    FROM shared_contacts sc
+    JOIN contacts c ON c.id = sc.shared_by
+    ORDER BY sc.created_at DESC
+  `).all();
+}
+
+// ── Generic settings helpers ──────────────────────────────────────────────
+
+function getSetting(key) {
+  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  return row ? row.value : null;
+}
+
+function setSetting(key, value) {
+  getDb().prepare(
+    'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
+  ).run(key, value);
+}
+
+// ── Backfill helpers ──────────────────────────────────────────────────────
+
+function countInboundMessages() {
+  return getDb().prepare("SELECT COUNT(*) AS n FROM messages WHERE direction = 'in'").get().n;
+}
+
+function getInboundMessagesAfter(afterId, limit) {
+  return getDb().prepare(`
+    SELECT m.id, m.contact_id, m.body,
+           c.name AS contact_name
+    FROM messages m
+    JOIN contacts c ON c.id = m.contact_id
+    WHERE m.direction = 'in' AND m.id > ?
+    ORDER BY m.id
+    LIMIT ?
+  `).all(afterId, limit);
+}
+
 // ── Contact helpers ───────────────────────────────────────────────────────
 
 function getAllContacts() {
@@ -217,4 +315,8 @@ module.exports = {
   getPendingScheduledMessages, updateScheduledMessageStatus,
   incrementAttemptCount, cancelScheduledMessage, failScheduledMessage,
   getAllContacts, searchContacts,
+  createTask, getPendingTasks, markTaskDone,
+  createSharedContact, getLastMessagesFromContact, getAllSharedContacts,
+  getSetting, setSetting,
+  countInboundMessages, getInboundMessagesAfter,
 };

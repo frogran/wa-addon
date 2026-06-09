@@ -175,3 +175,122 @@ describe('contact helpers', () => {
   });
 });
 
+// ── Task helpers ──────────────────────────────────────────────────────────
+
+describe('task helpers', () => {
+  let contactId, messageId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    contactId = db.upsertContact('+972501234567', 'Test Fan');
+    messageId = db.insertMessage(contactId, 'in', 'Please call me back', 1700000000, 'wa-t1');
+  });
+
+  afterEach(() => db.close());
+
+  test('createTask returns a numeric id', () => {
+    const id = db.createTask(contactId, messageId, 'Call back');
+    expect(typeof id).toBe('number');
+    expect(id).toBeGreaterThan(0);
+  });
+
+  test('getPendingTasks returns pending tasks with contact name and message snippet', () => {
+    db.createTask(contactId, messageId, 'Call back');
+    const tasks = db.getPendingTasks();
+    expect(tasks.length).toBe(1);
+    expect(tasks[0].body).toBe('Call back');
+    expect(tasks[0].contact_name).toBe('Test Fan');
+    expect(tasks[0].message_snippet).toBe('Please call me back');
+    expect(tasks[0].status).toBe('pending');
+  });
+
+  test('markTaskDone sets status to done and returns 1', () => {
+    const id = db.createTask(contactId, messageId, 'Call back');
+    const changed = db.markTaskDone(id);
+    expect(changed).toBe(1);
+    const tasks = db.getPendingTasks();
+    expect(tasks).toHaveLength(0);
+  });
+
+  test('markTaskDone returns 0 for non-existent id', () => {
+    expect(db.markTaskDone(9999)).toBe(0);
+  });
+
+  test('createTask with duplicate message_id+body is silently ignored', () => {
+    db.createTask(contactId, messageId, 'Call back');
+    const id2 = db.createTask(contactId, messageId, 'Call back');
+    expect(id2).toBeNull();
+    expect(db.getPendingTasks()).toHaveLength(1);
+  });
+});
+
+// ── shared_contacts helpers ───────────────────────────────────────────────
+
+describe('shared_contacts helpers', () => {
+  let sharedByContactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    sharedByContactId = db.upsertContact('+972501234567', 'Test Fan');
+  });
+
+  afterEach(() => db.close());
+
+  test('createSharedContact returns a numeric id', () => {
+    const id = db.createSharedContact('+972509999999', 'New Person', sharedByContactId);
+    expect(typeof id).toBe('number');
+    expect(id).toBeGreaterThan(0);
+  });
+
+  test('getAllSharedContacts returns rows with shared_by_name', () => {
+    db.createSharedContact('+972509999999', 'New Person', sharedByContactId);
+    const rows = db.getAllSharedContacts();
+    expect(rows.length).toBe(1);
+    expect(rows[0].phone).toBe('+972509999999');
+    expect(rows[0].name).toBe('New Person');
+    expect(rows[0].shared_by_name).toBe('Test Fan');
+  });
+
+  test('createSharedContact stores preceding message context as JSON', () => {
+    db.createSharedContact('+972509999999', 'New Person', sharedByContactId, null, ['Can you share her number?', 'She was at the event']);
+    const rows = db.getAllSharedContacts();
+    const ctx = JSON.parse(rows[0].context_before);
+    expect(ctx).toEqual(['Can you share her number?', 'She was at the event']);
+  });
+
+  test('getAllSharedContacts includes context_before field', () => {
+    db.createSharedContact('+972509999999', 'New Person', sharedByContactId);
+    const rows = db.getAllSharedContacts();
+    // context_before is null or a JSON string — field must exist
+    expect('context_before' in rows[0]).toBe(true);
+  });
+
+  test('createSharedContact with duplicate phone is ignored', () => {
+    db.createSharedContact('+972509999999', 'New Person', sharedByContactId);
+    const id2 = db.createSharedContact('+972509999999', 'New Person', sharedByContactId);
+    expect(id2).toBeNull();
+    expect(db.getAllSharedContacts()).toHaveLength(1);
+  });
+});
+
+// ── settings helpers ──────────────────────────────────────────────────────
+
+describe('settings helpers', () => {
+  beforeEach(() => db.init(':memory:'));
+  afterEach(() => db.close());
+
+  test('getSetting returns null for unknown key', () => {
+    expect(db.getSetting('unknown_key')).toBeNull();
+  });
+
+  test('setSetting and getSetting round-trip', () => {
+    db.setSetting('my_key', 'my_value');
+    expect(db.getSetting('my_key')).toBe('my_value');
+  });
+
+  test('setSetting overwrites existing value', () => {
+    db.setSetting('my_key', 'first');
+    db.setSetting('my_key', 'second');
+    expect(db.getSetting('my_key')).toBe('second');
+  });
+});

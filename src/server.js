@@ -40,6 +40,7 @@ function createApp() {
       const id = db.createScheduledMessage(Number(contact_id), body, Number(send_at));
       res.status(201).json({ id });
     } catch (err) {
+      console.error('POST /api/scheduled error:', err.message);
       res.status(422).json({ error: 'Invalid contact_id or database error' });
     }
   });

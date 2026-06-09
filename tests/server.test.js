@@ -81,6 +81,14 @@ describe('scheduled message routes', () => {
     expect(res.body.error).toMatch(/required/);
   });
 
+  test('POST /api/scheduled returns 400 for past send_at', async () => {
+    const res = await request(app)
+      .post('/api/scheduled')
+      .send({ contact_id: contactId, body: 'Hello!', send_at: 1000 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/future/i);
+  });
+
   test('GET /api/scheduled returns the created message with contact name', async () => {
     const sendAt = Math.floor(Date.now() / 1000) + 3600;
     await request(app)

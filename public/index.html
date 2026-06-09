@@ -193,7 +193,7 @@
       <h3>Schedule a message</h3>
 
       <div class="form-row">
-        <label>To</label>
+        <label for="contact-search">To</label>
         <div class="contact-picker">
           <input type="text" id="contact-search" placeholder="Search by name or number..." autocomplete="off">
           <input type="hidden" id="contact-id-value">
@@ -202,16 +202,16 @@
       </div>
 
       <div class="form-row">
-        <label>Message</label>
-        <textarea id="schedule-body" placeholder="Type your message..."></textarea>
+        <label for="schedule-body">Message</label>
+        <textarea id="schedule-body" dir="auto" placeholder="Type your message..."></textarea>
       </div>
 
       <div class="form-row">
-        <label>Send at</label>
+        <label for="schedule-time">Send at</label>
         <input type="datetime-local" id="schedule-time">
       </div>
 
-      <button class="primary" id="schedule-submit" onclick="submitSchedule()">Schedule</button>
+      <button type="button" class="primary" id="schedule-submit" onclick="submitSchedule()">Schedule</button>
       <div class="success-msg" id="schedule-success">Message scheduled!</div>
       <div class="error-msg" id="schedule-error"></div>
     </div>
@@ -292,16 +292,25 @@
       if (!e.target.closest('.contact-picker')) contactDropdown.classList.remove('open');
     });
 
+    contactDropdown.addEventListener('click', e => {
+      const opt = e.target.closest('.contact-option[data-id]');
+      if (opt) selectContact(opt.dataset.id, opt.dataset.name);
+    });
+
     async function fetchContacts(q) {
-      const contacts = await fetch(`/api/contacts?q=${encodeURIComponent(q)}`).then(r => r.json());
-      contactDropdown.innerHTML = contacts.length
-        ? contacts.map(c => `
-            <div class="contact-option" onclick="selectContact(${c.id}, '${escHtml(c.name)}')">
-              ${escHtml(c.name || c.phone)}
-              <span class="phone">${escHtml(c.phone)}</span>
-            </div>`).join('')
-        : '<div class="contact-option" style="color:#8b949e;cursor:default">No contacts found</div>';
-      contactDropdown.classList.add('open');
+      try {
+        const contacts = await fetch(`/api/contacts?q=${encodeURIComponent(q)}`).then(r => r.json());
+        contactDropdown.innerHTML = contacts.length
+          ? contacts.map(c => `
+              <div class="contact-option" data-id="${c.id}" data-name="${escHtml(c.name || c.phone)}">
+                ${escHtml(c.name || c.phone)}
+                <span class="phone">${escHtml(c.phone)}</span>
+              </div>`).join('')
+          : '<div class="contact-option" style="color:#8b949e;cursor:default">No contacts found</div>';
+        contactDropdown.classList.add('open');
+      } catch {
+        contactDropdown.classList.remove('open');
+      }
     }
 
     function selectContact(id, name) {
@@ -362,7 +371,12 @@
     // ── Schedule list ───────────────────────────────────────────────────
     async function refreshScheduleList() {
       const list = document.getElementById('schedule-list');
-      const rows = await fetch('/api/scheduled').then(r => r.json());
+      let rows;
+      try {
+        rows = await fetch('/api/scheduled').then(r => r.json());
+      } catch {
+        return;
+      }
       if (!rows.length) {
         list.innerHTML = '<p class="empty-state">No scheduled messages.</p>';
         return;
@@ -374,12 +388,20 @@
             <div class="body" dir="auto">${escHtml(r.body)}</div>
           </div>
           <div class="time">${formatTime(r.send_at)}</div>
-          <button class="cancel-btn" onclick="cancelMessage(${r.id})">Cancel</button>
+          <button type="button" class="cancel-btn" onclick="cancelMessage(${r.id})">Cancel</button>
         </div>`).join('');
     }
 
     async function cancelMessage(id) {
-      await fetch(`/api/scheduled/${id}`, { method: 'DELETE' });
+      try {
+        const res = await fetch(`/api/scheduled/${id}`, { method: 'DELETE' });
+        if (!res.ok && res.status !== 404) {
+          const data = await res.json().catch(() => ({}));
+          console.warn('Cancel failed:', data.error);
+        }
+      } catch (e) {
+        console.warn('Cancel request failed:', e.message);
+      }
       refreshScheduleList();
     }
 
@@ -391,8 +413,8 @@
 
     // ── Utilities ───────────────────────────────────────────────────────
     function escHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      if (str == null) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
     function formatTime(unixSec) {

@@ -106,6 +106,12 @@ describe('scheduled message routes', () => {
     const listRes = await request(app).get('/api/scheduled');
     expect(listRes.body).toHaveLength(0);
   });
+
+  test('DELETE /api/scheduled/:id returns 404 for non-existent id', async () => {
+    const res = await request(app).delete('/api/scheduled/9999');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBeDefined();
+  });
 });
 
 describe('contact routes', () => {

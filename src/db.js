@@ -179,9 +179,10 @@ function incrementAttemptCount(id) {
 }
 
 function cancelScheduledMessage(id) {
-  getDb().prepare(
+  const result = getDb().prepare(
     "UPDATE scheduled_messages SET status = 'cancelled' WHERE id = ? AND status = 'pending'"
   ).run(id);
+  return result.changes;
 }
 
 function failScheduledMessage(id, error, maxAttempts) {

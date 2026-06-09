@@ -30,15 +30,23 @@ function createApp() {
 
   app.post('/api/scheduled', (req, res) => {
     const { contact_id, body, send_at } = req.body;
-    if (!contact_id || !body || !send_at) {
+    if (contact_id == null || !body || send_at == null) {
       return res.status(400).json({ error: 'contact_id, body, and send_at are required' });
     }
-    const id = db.createScheduledMessage(Number(contact_id), body, Number(send_at));
-    res.status(201).json({ id });
+    if (Number(send_at) <= Math.floor(Date.now() / 1000)) {
+      return res.status(400).json({ error: 'send_at must be a future Unix timestamp' });
+    }
+    try {
+      const id = db.createScheduledMessage(Number(contact_id), body, Number(send_at));
+      res.status(201).json({ id });
+    } catch (err) {
+      res.status(422).json({ error: 'Invalid contact_id or database error' });
+    }
   });
 
   app.delete('/api/scheduled/:id', (req, res) => {
-    db.cancelScheduledMessage(Number(req.params.id));
+    const changed = db.cancelScheduledMessage(Number(req.params.id));
+    if (!changed) return res.status(404).json({ error: 'Message not found or already finalized' });
     res.json({ ok: true });
   });
 

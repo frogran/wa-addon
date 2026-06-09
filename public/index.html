@@ -16,7 +16,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       padding-bottom: 16px;
       border-bottom: 1px solid #21262d;
     }
@@ -34,18 +34,24 @@
     .badge.disconnected { background: #3d1515; color: #f85149; }
     nav {
       display: flex;
-      gap: 4px;
-      margin-bottom: 32px;
+      gap: 2px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid #21262d;
     }
     nav a {
       color: #8b949e;
       text-decoration: none;
-      padding: 6px 14px;
-      border-radius: 6px;
+      padding: 8px 16px;
       font-size: 0.9em;
-      transition: background 0.1s, color 0.1s;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      cursor: pointer;
+      transition: color 0.1s;
     }
-    nav a:hover { background: #21262d; color: #e6edf3; }
+    nav a:hover { color: #e6edf3; }
+    nav a.active { color: #e6edf3; border-bottom-color: #58a6ff; }
+    .tab { display: none; }
+    .tab.active { display: block; }
     #qr-section {
       display: none;
       margin-bottom: 24px;
@@ -58,7 +64,97 @@
     }
     #qr-section p { color: #8b949e; font-size: 0.85em; margin-bottom: 12px; }
     #qr-img { width: 200px; height: 200px; }
-    #content { color: #8b949e; font-size: 0.9em; }
+    /* Schedule tab */
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card h3 { font-size: 0.95em; margin-bottom: 16px; color: #e6edf3; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 0.8em; color: #8b949e; margin-bottom: 4px; }
+    .form-row input, .form-row textarea, .form-row select {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 8px 10px;
+      font-size: 0.9em;
+      font-family: inherit;
+    }
+    .form-row textarea { resize: vertical; min-height: 80px; }
+    .form-row input:focus, .form-row textarea:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+    .contact-picker { position: relative; }
+    .contact-picker input { cursor: text; }
+    .contact-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0; right: 0;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+      z-index: 10;
+      margin-top: 2px;
+    }
+    .contact-dropdown.open { display: block; }
+    .contact-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.875em;
+    }
+    .contact-option:hover { background: #21262d; }
+    .contact-option .phone { color: #8b949e; font-size: 0.85em; margin-left: 6px; }
+    button.primary {
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-size: 0.9em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button.primary:hover { background: #2ea043; }
+    button.primary:disabled { background: #21262d; color: #8b949e; cursor: not-allowed; }
+    .msg-list { display: flex; flex-direction: column; gap: 8px; }
+    .msg-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+    }
+    .msg-item .meta { flex: 1; min-width: 0; }
+    .msg-item .to { font-size: 0.8em; color: #8b949e; margin-bottom: 2px; }
+    .msg-item .body { font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .msg-item .time { font-size: 0.8em; color: #58a6ff; white-space: nowrap; }
+    button.cancel-btn {
+      background: none;
+      border: 1px solid #da3633;
+      color: #da3633;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.78em;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    button.cancel-btn:hover { background: #3d1515; }
+    .empty-state { color: #8b949e; font-size: 0.9em; padding: 16px 0; }
+    .placeholder-tab { color: #8b949e; font-size: 0.9em; padding-top: 8px; }
+    .success-msg { color: #3fb950; font-size: 0.85em; margin-top: 8px; display: none; }
+    .error-msg { color: #f85149; font-size: 0.85em; margin-top: 8px; display: none; }
   </style>
 </head>
 <body>
@@ -67,64 +163,244 @@
     <span id="status-badge" class="badge disconnected">Disconnected</span>
   </header>
 
-  <nav>
-    <a href="#">Inbox</a>
-    <a href="#">Tasks</a>
-    <a href="#">Schedule</a>
-    <a href="#">Contacts</a>
-    <a href="#">Settings</a>
-  </nav>
-
   <div id="qr-section">
     <p>Open WhatsApp on your phone and scan this code</p>
     <img id="qr-img" src="" alt="QR Code">
   </div>
 
-  <div id="content">
-    Connecting to WhatsApp...
+  <nav>
+    <a data-tab="inbox"    onclick="showTab('inbox')"    class="active">Inbox</a>
+    <a data-tab="tasks"    onclick="showTab('tasks')">Tasks</a>
+    <a data-tab="schedule" onclick="showTab('schedule')">Schedule</a>
+    <a data-tab="contacts" onclick="showTab('contacts')">Contacts</a>
+    <a data-tab="settings" onclick="showTab('settings')">Settings</a>
+  </nav>
+
+  <!-- Inbox tab (placeholder) -->
+  <div id="tab-inbox" class="tab active">
+    <p class="placeholder-tab">Inbox coming in Phase 5.</p>
+  </div>
+
+  <!-- Tasks tab (placeholder) -->
+  <div id="tab-tasks" class="tab">
+    <p class="placeholder-tab">Task extraction coming in Phase 3.</p>
+  </div>
+
+  <!-- Schedule tab -->
+  <div id="tab-schedule" class="tab">
+
+    <div class="card">
+      <h3>Schedule a message</h3>
+
+      <div class="form-row">
+        <label>To</label>
+        <div class="contact-picker">
+          <input type="text" id="contact-search" placeholder="Search by name or number..." autocomplete="off">
+          <input type="hidden" id="contact-id-value">
+          <div class="contact-dropdown" id="contact-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>Message</label>
+        <textarea id="schedule-body" placeholder="Type your message..."></textarea>
+      </div>
+
+      <div class="form-row">
+        <label>Send at</label>
+        <input type="datetime-local" id="schedule-time">
+      </div>
+
+      <button class="primary" id="schedule-submit" onclick="submitSchedule()">Schedule</button>
+      <div class="success-msg" id="schedule-success">Message scheduled!</div>
+      <div class="error-msg" id="schedule-error"></div>
+    </div>
+
+    <div class="card">
+      <h3>Pending</h3>
+      <div class="msg-list" id="schedule-list">
+        <p class="empty-state">No scheduled messages.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Contacts tab (placeholder) -->
+  <div id="tab-contacts" class="tab">
+    <p class="placeholder-tab">Contact intelligence coming in Phase 4.</p>
+  </div>
+
+  <!-- Settings tab (placeholder) -->
+  <div id="tab-settings" class="tab">
+    <p class="placeholder-tab">Settings coming soon.</p>
   </div>
 
   <script>
+    // ── Tab switching ───────────────────────────────────────────────────
+    function showTab(name) {
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('nav a').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      document.querySelector(`nav a[data-tab="${name}"]`).classList.add('active');
+      if (name === 'schedule') refreshScheduleList();
+    }
+
+    // ── Status polling ──────────────────────────────────────────────────
     const badge = document.getElementById('status-badge');
     const qrSection = document.getElementById('qr-section');
     const qrImg = document.getElementById('qr-img');
-    const content = document.getElementById('content');
-
-    const labels = {
-      connected: 'Connected',
-      qr_pending: 'Scan QR',
-      disconnected: 'Disconnected'
-    };
+    const statusLabels = { connected: 'Connected', qr_pending: 'Scan QR', disconnected: 'Disconnected' };
 
     async function pollStatus() {
       try {
-        const res = await fetch('/api/status');
-        const data = await res.json();
-
+        const data = await fetch('/api/status').then(r => r.json());
         badge.className = 'badge ' + data.bridge_status;
-        badge.textContent = labels[data.bridge_status] || data.bridge_status;
-
+        badge.textContent = statusLabels[data.bridge_status] || data.bridge_status;
         if (data.bridge_status === 'qr_pending') {
-          const qrRes = await fetch('/api/qr');
-          const qrData = await qrRes.json();
-          if (qrData.qr) {
-            qrImg.src = qrData.qr;
-            qrSection.style.display = 'block';
-          }
+          const { qr } = await fetch('/api/qr').then(r => r.json());
+          if (qr) { qrImg.src = qr; qrSection.style.display = 'block'; }
         } else {
           qrSection.style.display = 'none';
-          if (data.bridge_status === 'connected') {
-            content.textContent = 'Connected. Dashboard features coming in later phases.';
-          }
         }
-      } catch (e) {
+      } catch {
         badge.className = 'badge disconnected';
         badge.textContent = 'Server offline';
       }
     }
-
     pollStatus();
     setInterval(pollStatus, 5000);
+
+    // ── Contact picker ──────────────────────────────────────────────────
+    const contactSearch = document.getElementById('contact-search');
+    const contactIdValue = document.getElementById('contact-id-value');
+    const contactDropdown = document.getElementById('contact-dropdown');
+    let searchTimer = null;
+
+    contactSearch.addEventListener('input', () => {
+      contactIdValue.value = '';
+      clearTimeout(searchTimer);
+      const q = contactSearch.value.trim();
+      if (!q) { contactDropdown.classList.remove('open'); return; }
+      searchTimer = setTimeout(() => fetchContacts(q), 200);
+    });
+
+    contactSearch.addEventListener('focus', () => {
+      if (contactSearch.value.trim()) fetchContacts(contactSearch.value.trim());
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.contact-picker')) contactDropdown.classList.remove('open');
+    });
+
+    async function fetchContacts(q) {
+      const contacts = await fetch(`/api/contacts?q=${encodeURIComponent(q)}`).then(r => r.json());
+      contactDropdown.innerHTML = contacts.length
+        ? contacts.map(c => `
+            <div class="contact-option" onclick="selectContact(${c.id}, '${escHtml(c.name)}')">
+              ${escHtml(c.name || c.phone)}
+              <span class="phone">${escHtml(c.phone)}</span>
+            </div>`).join('')
+        : '<div class="contact-option" style="color:#8b949e;cursor:default">No contacts found</div>';
+      contactDropdown.classList.add('open');
+    }
+
+    function selectContact(id, name) {
+      contactIdValue.value = id;
+      contactSearch.value = name;
+      contactDropdown.classList.remove('open');
+    }
+
+    // ── Schedule form ───────────────────────────────────────────────────
+    async function submitSchedule() {
+      const contactId = contactIdValue.value;
+      const body = document.getElementById('schedule-body').value.trim();
+      const timeVal = document.getElementById('schedule-time').value;
+      const successEl = document.getElementById('schedule-success');
+      const errorEl = document.getElementById('schedule-error');
+
+      successEl.style.display = 'none';
+      errorEl.style.display = 'none';
+
+      if (!contactId || !body || !timeVal) {
+        errorEl.textContent = 'Please fill in all fields and select a contact.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const sendAt = Math.floor(new Date(timeVal).getTime() / 1000);
+      if (sendAt <= Math.floor(Date.now() / 1000)) {
+        errorEl.textContent = 'Please choose a time in the future.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const btn = document.getElementById('schedule-submit');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/scheduled', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contact_id: Number(contactId), body, send_at: sendAt })
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+        // reset form
+        contactSearch.value = '';
+        contactIdValue.value = '';
+        document.getElementById('schedule-body').value = '';
+        document.getElementById('schedule-time').value = '';
+        successEl.style.display = 'block';
+        setTimeout(() => successEl.style.display = 'none', 3000);
+        refreshScheduleList();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Failed to schedule message.';
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── Schedule list ───────────────────────────────────────────────────
+    async function refreshScheduleList() {
+      const list = document.getElementById('schedule-list');
+      const rows = await fetch('/api/scheduled').then(r => r.json());
+      if (!rows.length) {
+        list.innerHTML = '<p class="empty-state">No scheduled messages.</p>';
+        return;
+      }
+      list.innerHTML = rows.map(r => `
+        <div class="msg-item">
+          <div class="meta">
+            <div class="to">To: ${escHtml(r.contact_name || r.contact_id)}</div>
+            <div class="body" dir="auto">${escHtml(r.body)}</div>
+          </div>
+          <div class="time">${formatTime(r.send_at)}</div>
+          <button class="cancel-btn" onclick="cancelMessage(${r.id})">Cancel</button>
+        </div>`).join('');
+    }
+
+    async function cancelMessage(id) {
+      await fetch(`/api/scheduled/${id}`, { method: 'DELETE' });
+      refreshScheduleList();
+    }
+
+    // Refresh list every 30s when schedule tab is active
+    setInterval(() => {
+      const scheduleTab = document.getElementById('tab-schedule');
+      if (scheduleTab.classList.contains('active')) refreshScheduleList();
+    }, 30000);
+
+    // ── Utilities ───────────────────────────────────────────────────────
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatTime(unixSec) {
+      return new Date(unixSec * 1000).toLocaleString(undefined, {
+        month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
   </script>
 </body>
 </html>

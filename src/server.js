@@ -1,9 +1,11 @@
 const express = require('express');
 const path = require('path');
 const qrcode = require('qrcode');
+const multer = require('multer');
 const db = require('./db');
 const bridge = require('./bridge');
 const backfill = require('./backfill');
+const importer = require('./importer');
 
 function createApp() {
   const app = express();
@@ -90,6 +92,23 @@ function createApp() {
     }
     backfill.run(null).catch(err => console.error('Backfill failed:', err.message));
     res.json({ ok: true });
+  });
+
+  // ── Chat import ───────────────────────────────────────────────────────
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+  app.post('/api/import', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const userName = req.body.user_name || '';
+    const contactPhone = req.body.contact_phone || 'import_unknown';
+    try {
+      const text = req.file.buffer.toString('utf8');
+      const result = await importer.importFile(text, userName, contactPhone);
+      res.json(result);
+    } catch (err) {
+      console.error('Import error:', err.message);
+      res.status(500).json({ error: 'Import failed' });
+    }
   });
 
   return app;

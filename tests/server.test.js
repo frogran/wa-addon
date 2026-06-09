@@ -221,3 +221,32 @@ describe('backfill routes', () => {
     expect(res.body.ok).toBe(true);
   });
 });
+
+describe('import route', () => {
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+  });
+
+  afterEach(() => db.close());
+
+  test('POST /api/import returns 400 when no file is sent', async () => {
+    const res = await request(app)
+      .post('/api/import')
+      .field('contact_phone', '+972501234567');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  test('POST /api/import imports messages and returns counts', async () => {
+    const fileContent = '[15/01/2024, 14:22:13] Alice: Hello!\n[15/01/2024, 14:23:00] Me: Hi!';
+    const res = await request(app)
+      .post('/api/import')
+      .field('user_name', 'Me')
+      .field('contact_phone', '+972501234567')
+      .attach('file', Buffer.from(fileContent, 'utf8'), 'chat.txt');
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(2);
+    expect(res.body.skipped).toBe(0);
+  });
+});

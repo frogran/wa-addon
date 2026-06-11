@@ -58,4 +58,81 @@ async function extractTasksBatch(messages) {
   }
 }
 
-module.exports = { extractTasks, extractTasksBatch };
+async function buildContactProfile(messages, existingProfile) {
+  const client = getClient();
+  const existing = existingProfile && existingProfile.summary
+    ? `\n\nExisting profile:\nRELATIONSHIP_SUMMARY:\n${existingProfile.summary}\n\nSTYLE_TO_CONTACT:\n${existingProfile.style}`
+    : '';
+  const history = messages.map(m =>
+    `[${m.direction === 'out' ? 'You' : 'Them'}] ${m.body}`
+  ).join('\n');
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      system: `You are building a relationship and communication profile for a WhatsApp contact.
+You will be given the existing profile (if any) and the full message history with this contact.
+
+Update and enrich the profile — never remove existing observations unless you have clear evidence they are wrong.
+Only add, refine, or strengthen. The profile has two parts:
+
+RELATIONSHIP SUMMARY: Who is this person? What is the relationship? What do they typically want?
+What topics come up? What is their tone? Be concrete and specific — avoid generic labels.
+Include memorable details if any emerge.
+
+STYLE TO CONTACT: How does the user specifically write to this person?
+Note: formality level, language (Hebrew / English / mixed), emoji use, typical reply length,
+recurring phrases or expressions lifted from the sent messages.
+
+Respond in this exact format:
+RELATIONSHIP_SUMMARY:
+<text>
+
+STYLE_TO_CONTACT:
+<text>
+
+LANGUAGE: <en|he|mixed>
+
+CATEGORY: <fan|colleague|press|family|other>`,
+      messages: [{ role: 'user', content: `Message history:${existing}\n\n${history}` }],
+    });
+    const text = response.content[0].text;
+    const summary = (text.match(/RELATIONSHIP_SUMMARY:\s*([\s\S]*?)(?=\nSTYLE_TO_CONTACT:|$)/) || [])[1]?.trim() || '';
+    const style = (text.match(/STYLE_TO_CONTACT:\s*([\s\S]*?)(?=\nLANGUAGE:|$)/) || [])[1]?.trim() || '';
+    const language = (text.match(/LANGUAGE:\s*(\S+)/) || [])[1]?.toLowerCase() || 'en';
+    const category = (text.match(/CATEGORY:\s*(\S+)/) || [])[1]?.toLowerCase() || 'other';
+    if (!summary) return null;
+    return { summary, style, language, category };
+  } catch (err) {
+    console.error('buildContactProfile error:', err.message);
+    return null;
+  }
+}
+
+async function buildUserProfile(outgoingMessages, existingProfile) {
+  const client = getClient();
+  const existing = existingProfile ? `\n\nExisting style profile:\n${existingProfile}` : '';
+  const sample = outgoingMessages.map(m => `To ${m.contact_name}: ${m.body}`).join('\n');
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      system: `You are building a profile of a WhatsApp user's communication style.
+You will be given their existing style profile (if any) and a sample of messages they have sent.
+
+Enrich the profile — add new patterns, confirm existing ones.
+Note code-switching between Hebrew and English, emoji habits, typical reply lengths,
+tone variation across different types of contacts, recurring phrases.
+Never delete prior observations — only add and refine.
+
+Respond with a single prose profile (2-4 paragraphs). Be specific and concrete.`,
+      messages: [{ role: 'user', content: `Sent messages:${existing}\n\n${sample}` }],
+    });
+    return response.content[0].text.trim() || null;
+  } catch (err) {
+    console.error('buildUserProfile error:', err.message);
+    return null;
+  }
+}
+
+module.exports = { extractTasks, extractTasksBatch, buildContactProfile, buildUserProfile };

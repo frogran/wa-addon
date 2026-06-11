@@ -1,6 +1,6 @@
 jest.mock('@anthropic-ai/sdk');
 const Anthropic = require('@anthropic-ai/sdk');
-const { extractTasks, extractTasksBatch } = require('../src/llm');
+const { extractTasks, extractTasksBatch, buildContactProfile, buildUserProfile } = require('../src/llm');
 
 describe('extractTasks', () => {
   let mockCreate;
@@ -95,5 +95,72 @@ describe('extractTasksBatch', () => {
     const result = await extractTasksBatch(msgs);
     expect(result[10]).toEqual([]);
     expect(result[11]).toEqual([]);
+  });
+});
+
+describe('buildContactProfile', () => {
+  let mockCreate;
+
+  beforeEach(() => {
+    mockCreate = jest.fn();
+    Anthropic.mockImplementation(() => ({ messages: { create: mockCreate } }));
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  test('includes message history in prompt', async () => {
+    mockCreate.mockResolvedValue({ content: [{ text: 'RELATIONSHIP_SUMMARY:\nA fan\n\nSTYLE_TO_CONTACT:\nCasual\n\nLANGUAGE: en\n\nCATEGORY: fan' }] });
+    const msgs = [{ direction: 'in', body: 'Hello!', timestamp: 1000 }];
+    await buildContactProfile(msgs, null);
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.messages[0].content).toContain('[Them] Hello!');
+  });
+
+  test('includes existing profile in prompt when provided', async () => {
+    mockCreate.mockResolvedValue({ content: [{ text: 'RELATIONSHIP_SUMMARY:\nA fan\n\nSTYLE_TO_CONTACT:\nCasual\n\nLANGUAGE: en\n\nCATEGORY: fan' }] });
+    await buildContactProfile([], { summary: 'Old summary', style: 'Old style' });
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.messages[0].content).toContain('Old summary');
+    expect(call.messages[0].content).toContain('Old style');
+  });
+
+  test('parses all four sections from response', async () => {
+    mockCreate.mockResolvedValue({ content: [{ text: 'RELATIONSHIP_SUMMARY:\nBig fan from Tel Aviv\n\nSTYLE_TO_CONTACT:\nCasual, Hebrew/English mix\n\nLANGUAGE: mixed\n\nCATEGORY: fan' }] });
+    const result = await buildContactProfile([{ direction: 'in', body: 'hi', timestamp: 1 }], null);
+    expect(result.summary).toBe('Big fan from Tel Aviv');
+    expect(result.style).toBe('Casual, Hebrew/English mix');
+    expect(result.language).toBe('mixed');
+    expect(result.category).toBe('fan');
+  });
+
+  test('returns null on API error', async () => {
+    mockCreate.mockRejectedValue(new Error('API down'));
+    const result = await buildContactProfile([{ direction: 'in', body: 'hi', timestamp: 1 }], null);
+    expect(result).toBeNull();
+  });
+});
+
+describe('buildUserProfile', () => {
+  let mockCreate;
+
+  beforeEach(() => {
+    mockCreate = jest.fn();
+    Anthropic.mockImplementation(() => ({ messages: { create: mockCreate } }));
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  test('includes outgoing messages in prompt', async () => {
+    mockCreate.mockResolvedValue({ content: [{ text: 'Concise writer who code-switches.' }] });
+    const msgs = [{ body: 'Noted', contact_name: 'Alice', timestamp: 1000 }];
+    await buildUserProfile(msgs, null);
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.messages[0].content).toContain('To Alice: Noted');
+  });
+
+  test('returns null on API error', async () => {
+    mockCreate.mockRejectedValue(new Error('rate limit'));
+    const result = await buildUserProfile([{ body: 'Hi', contact_name: 'Bob', timestamp: 1 }], null);
+    expect(result).toBeNull();
   });
 });

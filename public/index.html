@@ -288,6 +288,175 @@
     }
     .panel-msg.out { border-left-color: #388bfd; color: #c9d1d9; }
     .panel-divider { border: none; border-top: 1px solid #21262d; margin: 20px 0; }
+    /* Inbox tab */
+    .inbox-layout {
+      display: flex;
+      gap: 0;
+      height: calc(100vh - 160px);
+      min-height: 400px;
+    }
+    .inbox-sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      border-right: 1px solid #21262d;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .inbox-sidebar-header {
+      padding: 10px 14px;
+      font-size: 0.8em;
+      color: #8b949e;
+      border-bottom: 1px solid #21262d;
+      flex-shrink: 0;
+    }
+    #inbox-list { flex: 1; overflow-y: auto; }
+    .inbox-list-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #21262d;
+    }
+    .inbox-list-item:hover { background: #161b22; }
+    .inbox-list-item.active { background: #1c2128; }
+    .inbox-list-item .ili-name { font-size: 0.85em; font-weight: 600; color: #e6edf3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .inbox-list-item .ili-snippet { font-size: 0.78em; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .inbox-list-item .ili-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .inbox-list-item .ili-time { font-size: 0.72em; color: #8b949e; margin-left: auto; }
+    .inbox-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .inbox-status-dot.ready    { background: #3fb950; }
+    .inbox-status-dot.pending  { background: #d29922; }
+    .inbox-status-dot.failed   { background: #f85149; }
+    .inbox-status-dot.none     { background: #30363d; }
+    .inbox-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .inbox-panel-placeholder {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8b949e;
+      font-size: 0.9em;
+    }
+    .inbox-panel-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .inbox-panel-header .iph-name {
+      font-weight: 600;
+      font-size: 1em;
+      color: #58a6ff;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .inbox-panel-header .iph-name:hover { text-decoration: underline; }
+    .inbox-panel-header .iph-meta { font-size: 0.8em; color: #8b949e; flex: 1; }
+    .inbox-mute-btn {
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 0.78em;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .inbox-mute-btn:hover { border-color: #f85149; color: #f85149; }
+    .inbox-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .inbox-section-label {
+      font-size: 0.72em;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+      margin-top: 8px;
+    }
+    .msg-bubble {
+      max-width: 75%;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.875em;
+      line-height: 1.5;
+    }
+    .msg-bubble.in  { background: #161b22; color: #c9d1d9; align-self: flex-start; }
+    .msg-bubble.out { background: #1a3a2a; color: #c9d1d9; align-self: flex-end; }
+    .msg-bubble.in.latest { border: 1px solid #3fb950; }
+    .inbox-divider { border: none; border-top: 1px solid #21262d; margin: 6px 0; }
+    .suggestion-block {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.875em;
+      line-height: 1.5;
+      color: #c9d1d9;
+      cursor: pointer;
+      transition: border-color 0.1s;
+    }
+    .suggestion-block:hover { border-color: #58a6ff; }
+    .suggestion-block.selected { border-color: #3fb950; background: #1a3a2a; }
+    .suggestion-num { font-size: 0.72em; color: #8b949e; margin-bottom: 3px; }
+    .inbox-compose {
+      border-top: 1px solid #21262d;
+      padding: 10px 16px;
+      flex-shrink: 0;
+      background: #0d1117;
+    }
+    .inbox-compose textarea {
+      width: 100%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 8px 10px;
+      font-size: 0.875em;
+      font-family: inherit;
+      resize: none;
+      height: 64px;
+      line-height: 1.5;
+    }
+    .inbox-compose textarea:focus { outline: none; border-color: #3fb950; }
+    .inbox-compose-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .inbox-send-btn {
+      flex: 1;
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 0.875em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .inbox-send-btn:hover { background: #2ea043; }
+    .inbox-send-btn:disabled { background: #21262d; color: #8b949e; cursor: not-allowed; }
+    .inbox-dismiss-btn, .inbox-regen-btn {
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 0.875em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .inbox-dismiss-btn:hover { border-color: #f85149; color: #f85149; }
+    .inbox-regen-btn:hover { border-color: #58a6ff; color: #58a6ff; }
   </style>
 </head>
 <body>
@@ -309,9 +478,19 @@
     <a data-tab="settings" onclick="showTab('settings')">Settings</a>
   </nav>
 
-  <!-- Inbox tab (placeholder) -->
+  <!-- Inbox tab -->
   <div id="tab-inbox" class="tab active">
-    <p class="placeholder-tab">Inbox coming in Phase 5.</p>
+    <div class="inbox-layout">
+      <div class="inbox-sidebar">
+        <div class="inbox-sidebar-header" id="inbox-sidebar-header">Unanswered (0)</div>
+        <div id="inbox-list">
+          <p class="empty-state" style="padding:12px 14px">No unanswered messages.</p>
+        </div>
+      </div>
+      <div class="inbox-panel" id="inbox-panel">
+        <div class="inbox-panel-placeholder">Select a message to draft a reply.</div>
+      </div>
+    </div>
   </div>
 
   <!-- Tasks tab -->
@@ -457,6 +636,7 @@
       if (name === 'tasks') refreshTasksList();
       if (name === 'settings') { pollBackfillStatus(); pollIntelStatus(); }
       if (name === 'contacts') { refreshContactList(''); refreshSharedContacts(); }
+      if (name === 'inbox') { refreshInboxList().then(() => { triggerInboxGenerate(); startInboxPolling(); }); }
     }
 
     // ── Status polling ──────────────────────────────────────────────────
@@ -956,6 +1136,217 @@
           ${ctxHtml ? `<div style="font-size:0.78em;color:#8b949e;width:100%"><span style="color:#6e7681">Context:</span>${ctxHtml}</div>` : ''}
         </div>`;
       }).join('');
+    }
+
+    // ── Inbox tab ────────────────────────────────────────────────────────
+    let inboxPoller = null;
+    let activeInboxMessageId = null;
+    let inboxData = [];
+
+    async function refreshInboxList() {
+      try {
+        const res = await fetch('/api/inbox');
+        if (!res.ok) return;
+        inboxData = await res.json();
+      } catch {
+        return;
+      }
+      const list = document.getElementById('inbox-list');
+      const header = document.getElementById('inbox-sidebar-header');
+      header.textContent = `Unanswered (${inboxData.length})`;
+      if (!inboxData.length) {
+        list.innerHTML = '<p class="empty-state" style="padding:12px 14px">No unanswered messages.</p>';
+        return;
+      }
+      list.innerHTML = inboxData.map(m => {
+        const statusClass = m.suggestion_status === 'ready' ? 'ready'
+          : m.suggestion_status === 'pending' ? 'pending'
+          : m.suggestion_status === 'failed' ? 'failed' : 'none';
+        return `
+          <div class="inbox-list-item${activeInboxMessageId === m.message_id ? ' active' : ''}"
+               data-message-id="${escHtml(String(m.message_id))}"
+               onclick="openInboxPanel(${m.message_id})">
+            <div class="ili-meta">
+              <span class="inbox-status-dot ${statusClass}"></span>
+              <span class="ili-name" dir="auto">${escHtml(m.contact_name || m.phone)}</span>
+              <span class="ili-time">${formatTime(m.timestamp)}</span>
+            </div>
+            <div class="ili-snippet" dir="auto">${escHtml(m.body)}</div>
+          </div>`;
+      }).join('');
+    }
+
+    async function openInboxPanel(messageId) {
+      activeInboxMessageId = messageId;
+      document.querySelectorAll('.inbox-list-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.messageId === String(messageId));
+      });
+
+      const panel = document.getElementById('inbox-panel');
+      const msg = inboxData.find(m => m.message_id === messageId);
+      if (!msg) return;
+
+      panel.innerHTML = `
+        <div class="inbox-panel-header">
+          <span class="iph-name" onclick="openContactFromInbox(${msg.contact_id})" dir="auto">${escHtml(msg.contact_name || msg.phone)} ↗</span>
+          <span class="iph-meta"></span>
+          <button class="inbox-mute-btn" onclick="muteInboxContact(${msg.contact_id})">Mute inbox</button>
+        </div>
+        <div class="inbox-scroll" id="inbox-scroll-${messageId}">
+          <div class="inbox-section-label">Recent conversation</div>
+          <div id="inbox-chat-${messageId}"><p style="color:#8b949e;font-size:0.85em">Loading…</p></div>
+          <hr class="inbox-divider">
+          <div class="inbox-section-label">Suggestions — click to edit</div>
+          <div id="inbox-suggestions-${messageId}">${renderSuggestions(msg, messageId)}</div>
+        </div>
+        <div class="inbox-compose" id="inbox-compose-${messageId}">
+          <textarea id="inbox-reply-${messageId}" dir="auto" placeholder="Click a suggestion above, or type your reply…"></textarea>
+          <div class="inbox-compose-actions">
+            <button class="inbox-send-btn" onclick="sendInboxReply(${messageId}, ${msg.contact_id})">Send via WhatsApp</button>
+            <button class="inbox-dismiss-btn" onclick="dismissInboxMessage(${messageId})">Dismiss</button>
+            <button class="inbox-regen-btn" onclick="regenInboxSuggestions(${messageId}, ${msg.contact_id})">↻</button>
+          </div>
+        </div>`;
+
+      loadInboxChat(msg.contact_id, messageId);
+    }
+
+    function renderSuggestions(msg, messageId) {
+      if (msg.suggestion_status === 'pending') {
+        return '<p style="color:#8b949e;font-size:0.85em">⟳ Generating suggestions…</p>';
+      }
+      if (msg.suggestion_status === 'failed' || !msg.suggestion_1) {
+        return '<p style="color:#f85149;font-size:0.85em">Failed to generate — click ↻ to retry.</p>';
+      }
+      return [msg.suggestion_1, msg.suggestion_2, msg.suggestion_3]
+        .filter(Boolean)
+        .map((s, i) => `
+          <div class="suggestion-block" onclick="selectSuggestion(${messageId}, this, ${escHtml(JSON.stringify(s))})">
+            <div class="suggestion-num">${i + 1}</div>
+            ${escHtml(s)}
+          </div>`).join('');
+    }
+
+    function selectSuggestion(messageId, el, text) {
+      document.querySelectorAll(`#inbox-suggestions-${messageId} .suggestion-block`).forEach(b => b.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById(`inbox-reply-${messageId}`).value = text;
+    }
+
+    async function loadInboxChat(contactId, messageId) {
+      try {
+        const res = await fetch(`/api/contacts/${contactId}`);
+        if (!res.ok) return;
+        const c = await res.json();
+        const chatEl = document.getElementById(`inbox-chat-${messageId}`);
+        if (!chatEl) return;
+        const msgs = (c.recent_messages || []).slice().reverse(); // oldest first
+        chatEl.innerHTML = msgs.map(m => `
+          <div class="msg-bubble ${m.direction}${m.direction === 'in' && msgs.indexOf(m) === msgs.length - 1 ? ' latest' : ''}" dir="auto">
+            ${escHtml(m.body)}
+          </div>`).join('');
+      } catch {}
+    }
+
+    function openContactFromInbox(contactId) {
+      showTab('contacts');
+      openContactPanel(contactId);
+    }
+
+    async function sendInboxReply(messageId, contactId) {
+      const textarea = document.getElementById(`inbox-reply-${messageId}`);
+      const body = textarea ? textarea.value.trim() : '';
+      if (!body) { textarea && (textarea.style.borderColor = '#f85149'); return; }
+      const btn = document.querySelector(`#inbox-compose-${messageId} .inbox-send-btn`);
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch(`/api/inbox/${messageId}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (btn) { btn.disabled = false; btn.textContent = data.error || 'Error'; setTimeout(() => { btn.textContent = 'Send via WhatsApp'; }, 2000); }
+          return;
+        }
+        // Remove from list and clear panel
+        inboxData = inboxData.filter(m => m.message_id !== messageId);
+        activeInboxMessageId = null;
+        await refreshInboxList();
+        document.getElementById('inbox-panel').innerHTML = '<div class="inbox-panel-placeholder">Reply sent.</div>';
+      } catch (e) {
+        if (btn) { btn.disabled = false; }
+      }
+    }
+
+    async function dismissInboxMessage(messageId) {
+      try {
+        await fetch(`/api/inbox/${messageId}/dismiss`, { method: 'POST' });
+      } catch {}
+      inboxData = inboxData.filter(m => m.message_id !== messageId);
+      activeInboxMessageId = null;
+      await refreshInboxList();
+      document.getElementById('inbox-panel').innerHTML = '<div class="inbox-panel-placeholder">Select a message to draft a reply.</div>';
+    }
+
+    async function muteInboxContact(contactId) {
+      try {
+        await fetch(`/api/contacts/${contactId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inbox_muted: 1 }),
+        });
+      } catch {}
+      inboxData = inboxData.filter(m => m.contact_id !== contactId);
+      activeInboxMessageId = null;
+      await refreshInboxList();
+      document.getElementById('inbox-panel').innerHTML = '<div class="inbox-panel-placeholder">Contact muted from Inbox.</div>';
+    }
+
+    async function regenInboxSuggestions(messageId, contactId) {
+      try {
+        await fetch('/api/inbox/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 1 }),
+        });
+      } catch {}
+      // Update local state to pending so spinner shows
+      const entry = inboxData.find(m => m.message_id === messageId);
+      if (entry) { entry.suggestion_status = 'pending'; entry.suggestion_1 = null; }
+      openInboxPanel(messageId);
+      startInboxPolling();
+    }
+
+    async function triggerInboxGenerate() {
+      try {
+        await fetch('/api/inbox/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 20 }),
+        });
+      } catch {}
+    }
+
+    function startInboxPolling() {
+      if (inboxPoller) clearInterval(inboxPoller);
+      inboxPoller = setInterval(async () => {
+        await refreshInboxList();
+        // Re-render open panel if suggestions arrived
+        if (activeInboxMessageId !== null) {
+          const msg = inboxData.find(m => m.message_id === activeInboxMessageId);
+          if (msg && msg.suggestion_status === 'ready') {
+            const sugEl = document.getElementById(`inbox-suggestions-${activeInboxMessageId}`);
+            if (sugEl) sugEl.innerHTML = renderSuggestions(msg, activeInboxMessageId);
+          }
+        }
+        const anyPending = inboxData.some(m => m.suggestion_status === 'pending');
+        if (!anyPending) {
+          clearInterval(inboxPoller);
+          inboxPoller = null;
+        }
+      }, 3000);
     }
 
     // ── Utilities ───────────────────────────────────────────────────────

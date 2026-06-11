@@ -182,6 +182,112 @@
       flex-shrink: 0;
     }
     button.done-btn:hover { background: #1a4731; }
+    /* Contacts tab */
+    .contacts-layout {
+      display: flex;
+      gap: 0;
+      height: calc(100vh - 160px);
+      min-height: 400px;
+    }
+    .contacts-sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      border-right: 1px solid #21262d;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .contacts-sidebar input {
+      margin: 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 6px 10px;
+      font-size: 0.85em;
+      font-family: inherit;
+      width: calc(100% - 24px);
+    }
+    .contacts-sidebar input:focus { outline: none; border-color: #58a6ff; }
+    #contact-list { flex: 1; overflow-y: auto; }
+    .contact-list-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .contact-list-item:hover { background: #161b22; }
+    .contact-list-item.active { background: #1c2128; }
+    .contact-list-item .cli-name { font-size: 0.85em; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lang-badge {
+      font-size: 0.65em;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #21262d;
+      color: #8b949e;
+      flex-shrink: 0;
+    }
+    .contacts-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+    .contacts-panel .panel-placeholder { color: #8b949e; font-size: 0.9em; }
+    .panel-header { margin-bottom: 20px; }
+    .panel-header .panel-name { font-size: 1.05em; font-weight: 700; }
+    .panel-header .panel-phone { font-size: 0.8em; color: #8b949e; margin-top: 2px; }
+    .panel-field { margin-bottom: 16px; }
+    .panel-field label { display: block; font-size: 0.78em; color: #8b949e; margin-bottom: 4px; }
+    .panel-field textarea, .panel-field input, .panel-field select {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 7px 10px;
+      font-size: 0.875em;
+      font-family: inherit;
+    }
+    .panel-field textarea { resize: vertical; }
+    .panel-field textarea:focus, .panel-field input:focus, .panel-field select:focus { outline: none; border-color: #58a6ff; }
+    .save-btn {
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 4px;
+      padding: 4px 12px;
+      font-size: 0.78em;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 4px;
+    }
+    .save-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+    .refresh-profile-btn {
+      background: none;
+      border: 1px solid #388bfd;
+      color: #58a6ff;
+      border-radius: 4px;
+      padding: 5px 14px;
+      font-size: 0.82em;
+      cursor: pointer;
+      font-family: inherit;
+      margin-bottom: 16px;
+    }
+    .refresh-profile-btn:hover { background: #1c2a3a; }
+    .panel-messages { margin-top: 20px; }
+    .panel-messages h4 { font-size: 0.78em; color: #8b949e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .panel-msg {
+      font-size: 0.82em;
+      color: #8b949e;
+      padding: 6px 8px;
+      border-left: 2px solid #21262d;
+      margin-bottom: 6px;
+    }
+    .panel-msg.out { border-left-color: #388bfd; color: #c9d1d9; }
+    .panel-divider { border: none; border-top: 1px solid #21262d; margin: 20px 0; }
   </style>
 </head>
 <body>
@@ -256,15 +362,24 @@
 
   <!-- Contacts tab -->
   <div id="tab-contacts" class="tab">
-    <div class="card">
+    <div class="contacts-layout">
+      <div class="contacts-sidebar">
+        <input type="text" id="contacts-search" placeholder="Search contacts…" autocomplete="off" oninput="refreshContactList(this.value)">
+        <div id="contact-list">
+          <p class="empty-state" style="padding:12px 14px">No contacts.</p>
+        </div>
+      </div>
+      <div class="contacts-panel" id="contacts-panel">
+        <p class="panel-placeholder">Select a contact to view their profile.</p>
+      </div>
+    </div>
+    <hr class="panel-divider">
+    <div class="card" style="margin-top:0">
       <h3>Shared Contacts</h3>
       <div class="msg-list" id="shared-contacts-list">
         <p class="empty-state">No contacts have been shared yet.</p>
       </div>
     </div>
-    <p class="placeholder-tab" style="margin-top:12px">
-      Full contact intelligence (clusters, relationship summaries) coming in Phase 4.
-    </p>
   </div>
 
   <!-- Settings tab -->
@@ -326,7 +441,7 @@
       }
       if (name === 'tasks') refreshTasksList();
       if (name === 'settings') pollBackfillStatus();
-      if (name === 'contacts') refreshSharedContacts();
+      if (name === 'contacts') { refreshContactList(''); refreshSharedContacts(); }
     }
 
     // ── Status polling ──────────────────────────────────────────────────
@@ -625,6 +740,107 @@
         errorEl.style.display = 'block';
       } finally {
         btn.disabled = false;
+      }
+    }
+
+    // ── Contacts tab ─────────────────────────────────────────────────────
+    let contactListTimer = null;
+
+    async function refreshContactList(query) {
+      clearTimeout(contactListTimer);
+      contactListTimer = setTimeout(async () => {
+        const list = document.getElementById('contact-list');
+        try {
+          const url = query ? `/api/contacts?q=${encodeURIComponent(query)}` : '/api/contacts';
+          const contacts = await fetch(url).then(r => r.json());
+          if (!contacts.length) {
+            list.innerHTML = '<p class="empty-state" style="padding:12px 14px">No contacts.</p>';
+            return;
+          }
+          const langLabel = { en: 'EN', he: 'HE', mixed: 'MIX' };
+          list.innerHTML = contacts.map(c => `
+            <div class="contact-list-item" data-contact-id="${escHtml(String(c.id))}" onclick="openContactPanel(${c.id})">
+              <span class="cli-name">${escHtml(c.name || c.phone)}</span>
+              ${c.language ? `<span class="lang-badge">${escHtml(langLabel[c.language] || c.language.toUpperCase())}</span>` : ''}
+            </div>`).join('');
+        } catch {
+          list.innerHTML = '<p class="empty-state" style="padding:12px 14px">Error loading.</p>';
+        }
+      }, 150);
+    }
+
+    async function openContactPanel(id) {
+      // Mark active
+      document.querySelectorAll('.contact-list-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.contactId === String(id));
+      });
+
+      const panel = document.getElementById('contacts-panel');
+      panel.innerHTML = '<p style="color:#8b949e;font-size:0.85em">Loading…</p>';
+
+      let c;
+      try {
+        c = await fetch(`/api/contacts/${id}`).then(r => r.json());
+      } catch {
+        panel.innerHTML = '<p style="color:#f85149;font-size:0.85em">Failed to load contact.</p>';
+        return;
+      }
+
+      const langOptions = ['en', 'he', 'mixed'].map(l =>
+        `<option value="${l}"${c.language === l ? ' selected' : ''}>${l}</option>`
+      ).join('');
+
+      const msgHtml = (c.recent_messages || []).map(m =>
+        `<div class="panel-msg ${m.direction === 'out' ? 'out' : ''}" dir="auto">${escHtml(m.body)}</div>`
+      ).join('');
+
+      panel.innerHTML = `
+        <div class="panel-header">
+          <div class="panel-name">${escHtml(c.name || c.phone)}</div>
+          <div class="panel-phone">${escHtml(c.phone || '')}</div>
+        </div>
+        <button class="refresh-profile-btn" onclick="triggerContactRefresh(${id})">↻ Refresh profile</button>
+        <div class="panel-field">
+          <label>Language</label>
+          <select onchange="saveContactField(${id}, 'language', this.value)">${langOptions}</select>
+        </div>
+        <div class="panel-field">
+          <label>Category</label>
+          <input type="text" id="panel-category-${id}" value="${escHtml(c.category || '')}" placeholder="fan, colleague, press…" dir="auto">
+          <button class="save-btn" onclick="saveContactField(${id}, 'category', document.getElementById('panel-category-${id}').value)">Save</button>
+        </div>
+        <div class="panel-field">
+          <label>Relationship summary</label>
+          <textarea id="panel-summary-${id}" rows="6" dir="auto">${escHtml(c.relationship_summary || '')}</textarea>
+          <button class="save-btn" onclick="saveContactField(${id}, 'relationship_summary', document.getElementById('panel-summary-${id}').value)">Save</button>
+        </div>
+        <div class="panel-field">
+          <label>How you write to them</label>
+          <textarea id="panel-style-${id}" rows="4" dir="auto">${escHtml(c.style_to_contact || '')}</textarea>
+          <button class="save-btn" onclick="saveContactField(${id}, 'style_to_contact', document.getElementById('panel-style-${id}').value)">Save</button>
+        </div>
+        ${msgHtml ? `<div class="panel-messages"><h4>Recent messages</h4>${msgHtml}</div>` : ''}
+      `;
+    }
+
+    async function saveContactField(id, field, value) {
+      try {
+        await fetch(`/api/contacts/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: value }),
+        });
+      } catch (e) {
+        console.warn('Save failed:', e.message);
+      }
+    }
+
+    async function triggerContactRefresh(id) {
+      try {
+        await fetch(`/api/contacts/${id}/refresh`, { method: 'POST' });
+        setTimeout(() => openContactPanel(id), 3000);
+      } catch (e) {
+        console.warn('Refresh failed:', e.message);
       }
     }
 

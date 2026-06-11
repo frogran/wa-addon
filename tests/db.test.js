@@ -420,6 +420,56 @@ describe('contact profile helpers', () => {
   });
 });
 
+describe('inbox and reply suggestion helpers', () => {
+  let contactId, messageId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    contactId = db.upsertContact('+972501234567', 'Alice');
+    messageId = db.insertMessage(contactId, 'in', 'Hey there!', 1000, 'wa-inbox-1');
+  });
+
+  afterEach(() => db.close());
+
+  test('getInboxMessages returns unanswered non-muted contacts', () => {
+    const rows = db.getInboxMessages();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].contact_name).toBe('Alice');
+    expect(rows[0].message_id).toBe(messageId);
+    expect(rows[0].suggestion_status).toBeNull();
+  });
+
+  test('getInboxMessages excludes muted contacts', () => {
+    db.patchContactProfile(contactId, { inbox_muted: 1 });
+    expect(db.getInboxMessages()).toHaveLength(0);
+  });
+
+  test('getInboxMessages excludes contacts whose last inbound has used suggestion', () => {
+    db.ensureSuggestionRow(messageId, contactId);
+    db.markSuggestionUsed(messageId);
+    expect(db.getInboxMessages()).toHaveLength(0);
+  });
+
+  test('storeSuggestions and getSuggestions round-trip', () => {
+    db.storeSuggestions(messageId, contactId, 'S1', 'S2', 'S3');
+    const row = db.getSuggestions(messageId);
+    expect(row.suggestion_1).toBe('S1');
+    expect(row.suggestion_2).toBe('S2');
+    expect(row.suggestion_3).toBe('S3');
+    expect(row.status).toBe('ready');
+  });
+
+  test('markSuggestionDismissed sets status to dismissed', () => {
+    db.ensureSuggestionRow(messageId, contactId);
+    db.markSuggestionDismissed(messageId);
+    expect(db.getSuggestions(messageId).status).toBe('dismissed');
+  });
+
+  test('getUnansweredCount returns 1 for contact with unanswered message', () => {
+    expect(db.getUnansweredCount(contactId)).toBe(1);
+  });
+});
+
 describe('user profile and outbound helpers', () => {
   let contactId;
 

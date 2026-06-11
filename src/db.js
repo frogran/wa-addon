@@ -109,6 +109,28 @@ function init(dbPath) {
 
   db.prepare('INSERT OR IGNORE INTO user_profile (id) VALUES (1)').run();
   db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('bridge_status', 'disconnected')").run();
+
+  // ── Phase 5 migration: add reply settings columns to contacts ─────────
+  const existingCols = new Set(
+    db.prepare('PRAGMA table_info(contacts)').all().map(r => r.name)
+  );
+  const colsToAdd = [
+    ['inbox_muted',            'INTEGER NOT NULL DEFAULT 0'],
+    ['reply_context_messages', 'INTEGER NOT NULL DEFAULT 20'],
+    ['reply_length',           "TEXT NOT NULL DEFAULT 'auto'"],
+    ['reply_tone',             "TEXT NOT NULL DEFAULT 'auto'"],
+    ['reply_language',         "TEXT NOT NULL DEFAULT 'auto'"],
+    ['reply_emoji',            "TEXT NOT NULL DEFAULT 'auto'"],
+    ['reply_greeting',         'INTEGER NOT NULL DEFAULT 1'],
+  ];
+  for (const [col, def] of colsToAdd) {
+    if (!existingCols.has(col)) {
+      db.exec(`ALTER TABLE contacts ADD COLUMN ${col} ${def}`);
+    }
+  }
+
+  // ── Phase 5 migration: unique index on reply_suggestions(message_id) ──
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_reply_suggestions_message ON reply_suggestions(message_id)`);
 }
 
 function close() {
@@ -323,7 +345,11 @@ function updateContactProfile(contactId, summary, style, language, category) {
 }
 
 function patchContactProfile(contactId, updates) {
-  const allowed = ['relationship_summary', 'style_to_contact', 'language', 'category'];
+  const allowed = [
+    'relationship_summary', 'style_to_contact', 'language', 'category',
+    'inbox_muted', 'reply_context_messages', 'reply_length', 'reply_tone',
+    'reply_language', 'reply_emoji', 'reply_greeting',
+  ];
   const fields = Object.keys(updates).filter(k => allowed.includes(k));
   if (!fields.length) {
     console.warn('patchContactProfile: no valid fields in updates', Object.keys(updates));
@@ -351,9 +377,12 @@ function getContactsToSeed(afterId, limit) {
 }
 
 function getContactDetail(contactId) {
-  const contact = getDb().prepare(
-    'SELECT id, name, phone, category, language, relationship_summary, style_to_contact FROM contacts WHERE id = ?'
-  ).get(contactId);
+  const contact = getDb().prepare(`
+    SELECT id, name, phone, category, language, relationship_summary, style_to_contact,
+           inbox_muted, reply_context_messages, reply_length, reply_tone,
+           reply_language, reply_emoji, reply_greeting
+    FROM contacts WHERE id = ?
+  `).get(contactId);
   if (!contact) return null;
   contact.recent_messages = getDb().prepare(
     'SELECT direction, body, timestamp FROM messages WHERE contact_id = ? ORDER BY id DESC LIMIT 5'
@@ -394,6 +423,92 @@ function getOutboundCount() {
   return getDb().prepare("SELECT COUNT(*) AS n FROM messages WHERE direction = 'out'").get().n;
 }
 
+// ── Inbox helpers ─────────────────────────────────────────────────────────
+
+function getInboxMessages() {
+  return getDb().prepare(`
+    SELECT
+      m.id           AS message_id,
+      c.id           AS contact_id,
+      c.name         AS contact_name,
+      c.phone,
+      m.body,
+      m.timestamp,
+      rs.status      AS suggestion_status,
+      rs.suggestion_1,
+      rs.suggestion_2,
+      rs.suggestion_3
+    FROM contacts c
+    JOIN messages m ON m.contact_id = c.id
+    LEFT JOIN reply_suggestions rs ON rs.message_id = m.id
+    WHERE c.inbox_muted = 0
+      AND m.direction = 'in'
+      AND m.id = (
+        SELECT MAX(m2.id) FROM messages m2
+        WHERE m2.contact_id = c.id AND m2.direction = 'in'
+      )
+      AND (rs.status IS NULL OR rs.status NOT IN ('used', 'dismissed'))
+    ORDER BY m.timestamp DESC
+  `).all();
+}
+
+function ensureSuggestionRow(messageId, contactId) {
+  getDb().prepare(
+    `INSERT OR IGNORE INTO reply_suggestions (message_id, contact_id, status) VALUES (?, ?, 'pending')`
+  ).run(messageId, contactId);
+}
+
+function storeSuggestions(messageId, contactId, s1, s2, s3) {
+  getDb().prepare(`
+    INSERT INTO reply_suggestions (message_id, contact_id, suggestion_1, suggestion_2, suggestion_3, status)
+    VALUES (?, ?, ?, ?, ?, 'ready')
+    ON CONFLICT(message_id) DO UPDATE SET
+      suggestion_1 = excluded.suggestion_1,
+      suggestion_2 = excluded.suggestion_2,
+      suggestion_3 = excluded.suggestion_3,
+      status = 'ready'
+  `).run(messageId, contactId, s1, s2, s3);
+}
+
+function getSuggestions(messageId) {
+  return getDb().prepare(
+    'SELECT suggestion_1, suggestion_2, suggestion_3, status FROM reply_suggestions WHERE message_id = ?'
+  ).get(messageId) || null;
+}
+
+function markSuggestionUsed(messageId) {
+  getDb().prepare("UPDATE reply_suggestions SET status = 'used' WHERE message_id = ?").run(messageId);
+}
+
+function markSuggestionDismissed(messageId) {
+  getDb().prepare("UPDATE reply_suggestions SET status = 'dismissed' WHERE message_id = ?").run(messageId);
+}
+
+function markSuggestionFailed(messageId) {
+  getDb().prepare("UPDATE reply_suggestions SET status = 'failed' WHERE message_id = ?").run(messageId);
+}
+
+function getUnansweredCount(contactId) {
+  const row = getDb().prepare(`
+    SELECT COUNT(*) AS n FROM messages m
+    LEFT JOIN reply_suggestions rs ON rs.message_id = m.id
+    WHERE m.contact_id = ?
+      AND m.direction = 'in'
+      AND m.id = (SELECT MAX(m2.id) FROM messages m2 WHERE m2.contact_id = ? AND m2.direction = 'in')
+      AND (rs.status IS NULL OR rs.status NOT IN ('used', 'dismissed'))
+  `).get(contactId, contactId);
+  return row ? row.n : 0;
+}
+
+function getMessageWithContact(messageId) {
+  return getDb().prepare(`
+    SELECT m.id, m.contact_id, m.body, c.phone, c.name
+    FROM messages m
+    JOIN contacts c ON c.id = m.contact_id
+    WHERE m.id = ?
+  `).get(messageId) || null;
+}
+
 module.exports = {
   init, close,
   upsertContact, insertMessage, getStatus, setStatus,
@@ -408,4 +523,7 @@ module.exports = {
   getContactProfile, updateContactProfile, patchContactProfile,
   getContactMessages, getContactsToSeed, getContactDetail, getContactInboundCount,
   getProfile, updateProfile, getOutgoingMessagesSample, getOutboundCount,
+  getInboxMessages, ensureSuggestionRow, storeSuggestions, getSuggestions,
+  markSuggestionUsed, markSuggestionDismissed, markSuggestionFailed,
+  getUnansweredCount, getMessageWithContact,
 };

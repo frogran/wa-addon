@@ -2,6 +2,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const db = require('./db');
 const llm = require('./llm');
+const contactIntel = require('./contact-intel');
 
 let client = null;
 let currentQr = null;
@@ -81,10 +82,23 @@ function init() {
       );
 
       if (msgId) {
-        // Fire task extraction async — non-blocking, failure is logged only
         llm.extractTasks(msg.body)
           .then((tasks) => tasks.forEach((body) => db.createTask(contactId, msgId, body)))
           .catch((err) => console.error('Task extraction error:', err.message));
+      }
+
+      // Refresh contact profile every 5th inbound message from this contact
+      const inboundCount = db.getContactInboundCount(contactId);
+      if (inboundCount > 0 && inboundCount % 5 === 0) {
+        contactIntel.refreshContact(contactId)
+          .catch(err => console.error('Contact refresh error:', err.message));
+      }
+
+      // Refresh user writing style profile every 20th outbound message overall
+      const outboundCount = db.getOutboundCount();
+      if (outboundCount > 0 && outboundCount % 20 === 0) {
+        contactIntel.refreshUserProfile()
+          .catch(err => console.error('User profile refresh error:', err.message));
       }
     } catch (err) {
       console.error('Error handling incoming message:', err.message);

@@ -6,6 +6,7 @@ const db = require('./db');
 const bridge = require('./bridge');
 const backfill = require('./backfill');
 const importer = require('./importer');
+const contactIntel = require('./contact-intel');
 
 function createApp() {
   const app = express();
@@ -61,6 +62,60 @@ function createApp() {
     res.json(contacts);
   });
 
+  // ── Contact detail ────────────────────────────────────────────────────
+  app.get('/api/contacts/:id', (req, res) => {
+    const contact = db.getContactDetail(Number(req.params.id));
+    if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    res.json(contact);
+  });
+
+  app.patch('/api/contacts/:id', (req, res) => {
+    const allowed = ['relationship_summary', 'style_to_contact', 'language', 'category'];
+    const updates = {};
+    allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    db.patchContactProfile(Number(req.params.id), updates);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/contacts/:id/refresh', (req, res) => {
+    contactIntel.refreshContact(Number(req.params.id))
+      .catch(err => console.error('Contact refresh error:', err.message));
+    res.json({ ok: true });
+  });
+
+  // ── User profile ──────────────────────────────────────────────────────
+  app.get('/api/profile', (req, res) => {
+    res.json(db.getProfile());
+  });
+
+  app.patch('/api/profile', (req, res) => {
+    const { global_style } = req.body;
+    if (global_style !== undefined) db.updateProfile(global_style);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/profile/refresh', (req, res) => {
+    contactIntel.refreshUserProfile()
+      .catch(err => console.error('Profile refresh error:', err.message));
+    res.json({ ok: true });
+  });
+
+  // ── Contact intelligence seed ─────────────────────────────────────────
+  app.post('/api/intel/seed', (req, res) => {
+    const status = db.getSetting('intel_status');
+    if (status === 'running') return res.status(409).json({ error: 'Intel seed already running' });
+    contactIntel.seedAll().catch(err => console.error('Intel seed failed:', err.message));
+    res.json({ ok: true });
+  });
+
+  app.get('/api/intel/status', (req, res) => {
+    res.json({
+      status: db.getSetting('intel_status') || 'idle',
+      processed: parseInt(db.getSetting('intel_processed') || '0', 10),
+      total: parseInt(db.getSetting('intel_total') || '0', 10),
+    });
+  });
+
   // ── Tasks ─────────────────────────────────────────────────────────────
   app.get('/api/tasks', (req, res) => {
     res.json(db.getPendingTasks());
@@ -90,7 +145,7 @@ function createApp() {
     if (status === 'running') {
       return res.status(409).json({ error: 'Backfill already running' });
     }
-    backfill.run(null).catch(err => console.error('Backfill failed:', err.message));
+    backfill.run(() => bridge.getChats()).catch(err => console.error('Backfill failed:', err.message));
     res.json({ ok: true });
   });
 

@@ -7,6 +7,12 @@ jest.mock('../src/bridge', () => ({
   getQr: jest.fn().mockReturnValue(null)
 }));
 
+jest.mock('../src/contact-intel', () => ({
+  seedAll: jest.fn().mockResolvedValue(undefined),
+  refreshContact: jest.fn().mockResolvedValue(undefined),
+  refreshUserProfile: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { createApp } = require('../src/server');
 
 let app;
@@ -276,5 +282,122 @@ describe('shared contacts routes', () => {
     expect(res.body[0].phone).toBe('+972509999999');
     expect(res.body[0].name).toBe('New Person');
     expect(res.body[0].shared_by_name).toBe('Test Fan');
+  });
+});
+
+describe('contact detail routes', () => {
+  let contactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+    contactId = db.upsertContact('+972501234567', 'Alice');
+  });
+
+  afterEach(() => db.close());
+
+  test('GET /api/contacts/:id returns contact detail with profile', async () => {
+    db.updateContactProfile(contactId, 'Big fan', 'Casual', 'he', 'fan');
+    db.insertMessage(contactId, 'in', 'Hi!', 1000, 'wa-1');
+    const res = await request(app).get(`/api/contacts/${contactId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Alice');
+    expect(res.body.relationship_summary).toBe('Big fan');
+    expect(res.body.recent_messages).toHaveLength(1);
+  });
+
+  test('GET /api/contacts/:id returns 404 for unknown id', async () => {
+    const res = await request(app).get('/api/contacts/9999');
+    expect(res.status).toBe(404);
+  });
+
+  test('PATCH /api/contacts/:id updates profile fields', async () => {
+    const res = await request(app)
+      .patch(`/api/contacts/${contactId}`)
+      .send({ relationship_summary: 'Updated', category: 'colleague' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    const profile = db.getContactProfile(contactId);
+    expect(profile.summary).toBe('Updated');
+    expect(profile.category).toBe('colleague');
+  });
+
+  test('PATCH /api/contacts/:id ignores unknown fields', async () => {
+    const res = await request(app)
+      .patch(`/api/contacts/${contactId}`)
+      .send({ relationship_summary: 'Safe', evil_field: 'dropped' });
+    expect(res.status).toBe(200);
+    expect(db.getContactProfile(contactId).summary).toBe('Safe');
+  });
+
+  test('POST /api/contacts/:id/refresh returns 200', async () => {
+    const res = await request(app).post(`/api/contacts/${contactId}/refresh`);
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+});
+
+describe('user profile routes', () => {
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+  });
+
+  afterEach(() => db.close());
+
+  test('GET /api/profile returns global_style', async () => {
+    db.updateProfile('Writes concisely.');
+    const res = await request(app).get('/api/profile');
+    expect(res.status).toBe(200);
+    expect(res.body.global_style).toBe('Writes concisely.');
+  });
+
+  test('PATCH /api/profile updates global_style', async () => {
+    const res = await request(app)
+      .patch('/api/profile')
+      .send({ global_style: 'New style' });
+    expect(res.status).toBe(200);
+    expect(db.getProfile().global_style).toBe('New style');
+  });
+
+  test('POST /api/profile/refresh returns 200', async () => {
+    const res = await request(app).post('/api/profile/refresh');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+});
+
+describe('intel routes', () => {
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+  });
+
+  afterEach(() => {
+    db.close();
+    jest.clearAllMocks();
+  });
+
+  test('POST /api/intel/seed returns 200 and triggers seedAll', async () => {
+    const contactIntel = require('../src/contact-intel');
+    const res = await request(app).post('/api/intel/seed');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(contactIntel.seedAll).toHaveBeenCalledTimes(1);
+  });
+
+  test('POST /api/intel/seed returns 409 when already running', async () => {
+    db.setSetting('intel_status', 'running');
+    const res = await request(app).post('/api/intel/seed');
+    expect(res.status).toBe(409);
+  });
+
+  test('GET /api/intel/status returns correct shape', async () => {
+    db.setSetting('intel_status', 'done');
+    db.setSetting('intel_processed', '5');
+    db.setSetting('intel_total', '10');
+    const res = await request(app).get('/api/intel/status');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'done', processed: 5, total: 10 });
   });
 });

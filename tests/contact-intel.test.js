@@ -1,5 +1,4 @@
 jest.mock('../src/llm');
-const llm = require('../src/llm');
 let db = require('../src/db');
 
 // Re-require after mocks to get fresh module state
@@ -106,8 +105,8 @@ describe('seedAll', () => {
     llmFresh.buildUserProfile = jest.fn().mockResolvedValue('style');
     const id1 = db.upsertContact('+1', 'A');
     const id2 = db.upsertContact('+2', 'B');
-    db.insertMessage(id1, 'in', 'hi', 1000, 'wa-1');
-    db.insertMessage(id2, 'in', 'hi', 1001, 'wa-2');
+    db.insertMessage(id1, 'in', 'msg from A', 1000, 'wa-1');
+    db.insertMessage(id2, 'in', 'msg from B', 1001, 'wa-2');
 
     // Simulate: id1 was already seeded in a prior errored run
     db.setSetting('intel_last_seeded_contact_id', String(id1));
@@ -119,6 +118,24 @@ describe('seedAll', () => {
     // Should only process id2
     expect(llmFresh.buildContactProfile).toHaveBeenCalledTimes(1);
     const [calledMessages] = llmFresh.buildContactProfile.mock.calls[0];
-    expect(calledMessages[0].body).toBe('hi'); // id2's message
+    expect(calledMessages[0].body).toBe('msg from B');
+  });
+
+  test('sets intel_status to error and unblocks on exception', async () => {
+    const llmFresh = require('../src/llm');
+    llmFresh.buildContactProfile = jest.fn().mockRejectedValue(new Error('API exploded'));
+    llmFresh.buildUserProfile = jest.fn().mockResolvedValue('style');
+    const cid = db.upsertContact('+1', 'A');
+    db.insertMessage(cid, 'in', 'hi', 1000, 'wa-1');
+
+    await contactIntel.seedAll();
+
+    expect(db.getSetting('intel_status')).toBe('error');
+    // Verify isRunning was reset — a second call should proceed (not be a no-op)
+    llmFresh.buildContactProfile = jest.fn().mockResolvedValue({ summary: 'x', style: 'y', language: 'en', category: 'fan' });
+    llmFresh.buildUserProfile = jest.fn().mockResolvedValue('style');
+    db.setSetting('intel_status', 'error'); // ensure resume mode
+    await contactIntel.seedAll();
+    expect(db.getSetting('intel_status')).toBe('done');
   });
 });

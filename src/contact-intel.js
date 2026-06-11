@@ -36,7 +36,7 @@ async function seedAll() {
     let lastId = parseInt(db.getSetting('intel_last_seeded_contact_id') || '0', 10);
     let processed = parseInt(db.getSetting('intel_processed') || '0', 10);
     for (const contact of contacts) {
-      if (contact.id <= lastId) { processed++; continue; }
+      if (contact.id <= lastId) continue;
       await refreshContact(contact.id);
       lastId = contact.id;
       processed++;

@@ -465,6 +465,12 @@ describe('inbox and reply suggestion helpers', () => {
     expect(db.getSuggestions(messageId).status).toBe('dismissed');
   });
 
+  test('markSuggestionFailed sets status to failed', () => {
+    db.ensureSuggestionRow(messageId, contactId);
+    db.markSuggestionFailed(messageId);
+    expect(db.getSuggestions(messageId).status).toBe('failed');
+  });
+
   test('getUnansweredCount returns 1 for contact with unanswered message', () => {
     expect(db.getUnansweredCount(contactId)).toBe(1);
   });

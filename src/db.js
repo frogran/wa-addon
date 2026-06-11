@@ -448,7 +448,7 @@ function getInboxMessages() {
         WHERE m2.contact_id = c.id AND m2.direction = 'in'
       )
       AND (rs.status IS NULL OR rs.status NOT IN ('used', 'dismissed'))
-    ORDER BY m.timestamp DESC
+    ORDER BY m.timestamp DESC, m.id DESC
   `).all();
 }
 
@@ -502,7 +502,7 @@ function getUnansweredCount(contactId) {
 
 function getMessageWithContact(messageId) {
   return getDb().prepare(`
-    SELECT m.id, m.contact_id, m.body, c.phone, c.name
+    SELECT m.id, m.contact_id, m.body, m.direction, c.phone, c.name
     FROM messages m
     JOIN contacts c ON c.id = m.contact_id
     WHERE m.id = ?

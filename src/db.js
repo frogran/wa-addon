@@ -481,7 +481,7 @@ function markSuggestionUsed(messageId) {
 }
 
 function markSuggestionDismissed(messageId) {
-  getDb().prepare("UPDATE reply_suggestions SET status = 'dismissed' WHERE message_id = ?").run(messageId);
+  return getDb().prepare("UPDATE reply_suggestions SET status = 'dismissed' WHERE message_id = ?").run(messageId);
 }
 
 function markSuggestionFailed(messageId) {

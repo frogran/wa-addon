@@ -144,7 +144,8 @@ function createApp() {
   app.post('/api/inbox/:messageId/dismiss', (req, res) => {
     const id = Number(req.params.messageId);
     if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
-    db.markSuggestionDismissed(id);
+    const result = db.markSuggestionDismissed(id);
+    if (!result.changes) return res.status(404).json({ error: 'Suggestion not found' });
     res.json({ ok: true });
   });
 
@@ -157,7 +158,7 @@ function createApp() {
     if (!msg) return res.status(404).json({ error: 'Message not found' });
     try {
       await bridge.sendMessage(msg.phone, body);
-      db.insertMessage(msg.contact_id, 'out', body, Math.floor(Date.now() / 1000), `manual-${Date.now()}`);
+      db.insertMessage(msg.contact_id, 'out', body, Math.floor(Date.now() / 1000), `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       db.markSuggestionUsed(id);
       res.json({ ok: true });
     } catch (err) {

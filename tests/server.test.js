@@ -471,4 +471,14 @@ describe('inbox routes', () => {
       .send({ body: 'hello' });
     expect(res.status).toBe(404);
   });
+
+  test('POST /api/inbox/:messageId/send sends message and marks used', async () => {
+    db.ensureSuggestionRow(messageId, contactId);
+    const res = await request(app)
+      .post(`/api/inbox/${messageId}/send`)
+      .send({ body: 'Hello there' });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(db.getSuggestions(messageId).status).toBe('used');
+  });
 });

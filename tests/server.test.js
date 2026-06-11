@@ -311,6 +311,13 @@ describe('contact detail routes', () => {
     expect(res.status).toBe(404);
   });
 
+  test('PATCH /api/contacts/:id returns 404 for unknown contact', async () => {
+    const res = await request(app)
+      .patch('/api/contacts/9999')
+      .send({ relationship_summary: 'x' });
+    expect(res.status).toBe(404);
+  });
+
   test('PATCH /api/contacts/:id updates profile fields', async () => {
     const res = await request(app)
       .patch(`/api/contacts/${contactId}`)
@@ -330,10 +337,12 @@ describe('contact detail routes', () => {
     expect(db.getContactProfile(contactId).summary).toBe('Safe');
   });
 
-  test('POST /api/contacts/:id/refresh returns 200', async () => {
+  test('POST /api/contacts/:id/refresh returns 200 and calls refreshContact', async () => {
+    const contactIntel = require('../src/contact-intel');
     const res = await request(app).post(`/api/contacts/${contactId}/refresh`);
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
+    expect(contactIntel.refreshContact).toHaveBeenCalledWith(contactId);
   });
 });
 
@@ -360,10 +369,12 @@ describe('user profile routes', () => {
     expect(db.getProfile().global_style).toBe('New style');
   });
 
-  test('POST /api/profile/refresh returns 200', async () => {
+  test('POST /api/profile/refresh returns 200 and calls refreshUserProfile', async () => {
+    const contactIntel = require('../src/contact-intel');
     const res = await request(app).post('/api/profile/refresh');
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
+    expect(contactIntel.refreshUserProfile).toHaveBeenCalledTimes(1);
   });
 });
 

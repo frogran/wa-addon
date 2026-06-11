@@ -64,21 +64,29 @@ function createApp() {
 
   // ── Contact detail ────────────────────────────────────────────────────
   app.get('/api/contacts/:id', (req, res) => {
-    const contact = db.getContactDetail(Number(req.params.id));
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
+    const contact = db.getContactDetail(id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
     res.json(contact);
   });
 
   app.patch('/api/contacts/:id', (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
+    if (!db.getContactDetail(id)) return res.status(404).json({ error: 'Contact not found' });
     const allowed = ['relationship_summary', 'style_to_contact', 'language', 'category'];
     const updates = {};
     allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
-    db.patchContactProfile(Number(req.params.id), updates);
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'No valid fields provided' });
+    db.patchContactProfile(id, updates);
     res.json({ ok: true });
   });
 
   app.post('/api/contacts/:id/refresh', (req, res) => {
-    contactIntel.refreshContact(Number(req.params.id))
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
+    contactIntel.refreshContact(id)
       .catch(err => console.error('Contact refresh error:', err.message));
     res.json({ ok: true });
   });

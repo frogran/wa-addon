@@ -422,6 +422,21 @@
       <div class="error-msg" id="import-error"></div>
     </div>
 
+    <div class="card">
+      <h3>Contact Intelligence</h3>
+      <p style="font-size:0.85em;color:#8b949e;margin-bottom:14px">
+        Build relationship and writing-style profiles for all contacts from their message history.
+      </p>
+      <button type="button" class="primary" id="intel-btn" onclick="triggerIntelSeed()">Generate profiles</button>
+      <div id="intel-status-text" style="margin-top:10px;font-size:0.85em;color:#8b949e"></div>
+      <div id="intel-progress-wrap" style="display:none;margin-top:8px">
+        <div style="background:#21262d;border-radius:4px;height:6px">
+          <div id="intel-bar" style="background:#3fb950;border-radius:4px;height:6px;width:0%;transition:width 0.3s"></div>
+        </div>
+        <div id="intel-counts" style="margin-top:4px;font-size:0.8em;color:#8b949e"></div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -440,7 +455,7 @@
         if (!timeInput.value) timeInput.value = local;
       }
       if (name === 'tasks') refreshTasksList();
-      if (name === 'settings') pollBackfillStatus();
+      if (name === 'settings') { pollBackfillStatus(); pollIntelStatus(); }
       if (name === 'contacts') { refreshContactList(''); refreshSharedContacts(); }
     }
 
@@ -705,6 +720,61 @@
         document.getElementById('backfill-bar').style.width = pct + '%';
         document.getElementById('backfill-counts').textContent =
           `${data.processed} / ${data.total} messages`;
+      }
+    }
+
+    // ── Contact intelligence ─────────────────────────────────────────────
+    let intelPoller = null;
+
+    async function pollIntelStatus() {
+      try {
+        const data = await fetch('/api/intel/status').then(r => r.json());
+        updateIntelUI(data);
+        if (data.status === 'running') startIntelPolling();
+      } catch {}
+    }
+
+    async function triggerIntelSeed() {
+      const btn = document.getElementById('intel-btn');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/intel/seed', { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          document.getElementById('intel-status-text').textContent = data.error || 'Error';
+          btn.disabled = false;
+          return;
+        }
+        startIntelPolling();
+      } catch {
+        btn.disabled = false;
+      }
+    }
+
+    function startIntelPolling() {
+      if (intelPoller) clearInterval(intelPoller);
+      intelPoller = setInterval(async () => {
+        try {
+          const data = await fetch('/api/intel/status').then(r => r.json());
+          updateIntelUI(data);
+          if (data.status !== 'running') {
+            clearInterval(intelPoller);
+            intelPoller = null;
+            document.getElementById('intel-btn').disabled = false;
+          }
+        } catch {}
+      }, 2000);
+    }
+
+    function updateIntelUI(data) {
+      const labels = { idle: '', running: 'Building profiles…', done: 'Done!', error: 'Error — check server logs.' };
+      document.getElementById('intel-status-text').textContent = labels[data.status] || data.status;
+      const wrap = document.getElementById('intel-progress-wrap');
+      if (data.status === 'running' || data.status === 'done') {
+        wrap.style.display = 'block';
+        const pct = data.total > 0 ? Math.round(data.processed / data.total * 100) : 0;
+        document.getElementById('intel-bar').style.width = pct + '%';
+        document.getElementById('intel-counts').textContent = `${data.processed} / ${data.total} contacts`;
       }
     }
 

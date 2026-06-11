@@ -745,6 +745,7 @@
 
     // ── Contacts tab ─────────────────────────────────────────────────────
     let contactListTimer = null;
+    let activeContactId = null;
 
     async function refreshContactList(query) {
       clearTimeout(contactListTimer);
@@ -760,7 +761,7 @@
           const langLabel = { en: 'EN', he: 'HE', mixed: 'MIX' };
           list.innerHTML = contacts.map(c => `
             <div class="contact-list-item" data-contact-id="${escHtml(String(c.id))}" onclick="openContactPanel(${c.id})">
-              <span class="cli-name">${escHtml(c.name || c.phone)}</span>
+              <span class="cli-name" dir="auto">${escHtml(c.name || c.phone)}</span>
               ${c.language ? `<span class="lang-badge">${escHtml(langLabel[c.language] || c.language.toUpperCase())}</span>` : ''}
             </div>`).join('');
         } catch {
@@ -770,6 +771,7 @@
     }
 
     async function openContactPanel(id) {
+      activeContactId = id;
       // Mark active
       document.querySelectorAll('.contact-list-item').forEach(el => {
         el.classList.toggle('active', el.dataset.contactId === String(id));
@@ -780,12 +782,15 @@
 
       let c;
       try {
-        c = await fetch(`/api/contacts/${id}`).then(r => r.json());
+        const res = await fetch(`/api/contacts/${id}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        c = await res.json();
       } catch {
         panel.innerHTML = '<p style="color:#f85149;font-size:0.85em">Failed to load contact.</p>';
         return;
       }
 
+      if (activeContactId !== id) return;
       const langOptions = ['en', 'he', 'mixed'].map(l =>
         `<option value="${l}"${c.language === l ? ' selected' : ''}>${l}</option>`
       ).join('');
@@ -796,7 +801,7 @@
 
       panel.innerHTML = `
         <div class="panel-header">
-          <div class="panel-name">${escHtml(c.name || c.phone)}</div>
+          <div class="panel-name" dir="auto">${escHtml(c.name || c.phone)}</div>
           <div class="panel-phone">${escHtml(c.phone || '')}</div>
         </div>
         <button class="refresh-profile-btn" onclick="triggerContactRefresh(${id})">↻ Refresh profile</button>
@@ -824,14 +829,18 @@
     }
 
     async function saveContactField(id, field, value) {
+      const btn = document.activeElement && document.activeElement.classList.contains('save-btn') ? document.activeElement : null;
       try {
-        await fetch(`/api/contacts/${id}`, {
+        const res = await fetch(`/api/contacts/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ [field]: value }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (btn) { const orig = btn.textContent; btn.textContent = '✓ Saved'; setTimeout(() => { btn.textContent = orig; }, 1500); }
       } catch (e) {
         console.warn('Save failed:', e.message);
+        if (btn) { btn.style.color = '#f85149'; setTimeout(() => { btn.style.color = ''; }, 2000); }
       }
     }
 

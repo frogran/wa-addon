@@ -13,6 +13,11 @@ jest.mock('../src/contact-intel', () => ({
   refreshUserProfile: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../src/reply-engine', () => ({
+  generateBatch: jest.fn().mockResolvedValue(undefined),
+  generateForMessage: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { createApp } = require('../src/server');
 
 let app;
@@ -410,5 +415,60 @@ describe('intel routes', () => {
     const res = await request(app).get('/api/intel/status');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: 'done', processed: 5, total: 10 });
+  });
+});
+
+describe('inbox routes', () => {
+  let contactId, messageId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+    contactId = db.upsertContact('+972501234567', 'Alice');
+    messageId = db.insertMessage(contactId, 'in', 'Hey!', 1000, 'wa-inbox-1');
+  });
+
+  afterEach(() => {
+    db.close();
+    jest.clearAllMocks();
+  });
+
+  test('GET /api/inbox returns unanswered messages', async () => {
+    const res = await request(app).get('/api/inbox');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].contact_name).toBe('Alice');
+    expect(res.body[0].message_id).toBe(messageId);
+  });
+
+  test('POST /api/inbox/generate returns 200 and calls generateBatch', async () => {
+    const replyEngine = require('../src/reply-engine');
+    const res = await request(app)
+      .post('/api/inbox/generate')
+      .send({ limit: 10 });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(replyEngine.generateBatch).toHaveBeenCalledWith(10);
+  });
+
+  test('POST /api/inbox/:messageId/dismiss marks suggestion dismissed', async () => {
+    db.ensureSuggestionRow(messageId, contactId);
+    const res = await request(app).post(`/api/inbox/${messageId}/dismiss`);
+    expect(res.status).toBe(200);
+    expect(db.getSuggestions(messageId).status).toBe('dismissed');
+  });
+
+  test('POST /api/inbox/:messageId/send returns 400 when body is missing', async () => {
+    const res = await request(app)
+      .post(`/api/inbox/${messageId}/send`)
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /api/inbox/:messageId/send returns 404 for unknown message', async () => {
+    const res = await request(app)
+      .post('/api/inbox/9999/send')
+      .send({ body: 'hello' });
+    expect(res.status).toBe(404);
   });
 });

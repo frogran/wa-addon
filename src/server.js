@@ -12,6 +12,7 @@ function createApp() {
   const app = express();
   app.use(express.json());
   app.use(express.static(path.join(__dirname, '..', 'public')));
+  const replyEngine = require('./reply-engine');
 
   app.get('/api/status', (req, res) => {
     res.json({
@@ -75,7 +76,11 @@ function createApp() {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
     if (!db.getContactDetail(id)) return res.status(404).json({ error: 'Contact not found' });
-    const allowed = ['relationship_summary', 'style_to_contact', 'language', 'category'];
+    const allowed = [
+      'relationship_summary', 'style_to_contact', 'language', 'category',
+      'inbox_muted', 'reply_context_messages', 'reply_length', 'reply_tone',
+      'reply_language', 'reply_emoji', 'reply_greeting',
+    ];
     const updates = {};
     allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
     if (!Object.keys(updates).length) return res.status(400).json({ error: 'No valid fields provided' });
@@ -122,6 +127,43 @@ function createApp() {
       processed: parseInt(db.getSetting('intel_processed') || '0', 10),
       total: parseInt(db.getSetting('intel_total') || '0', 10),
     });
+  });
+
+  // ── Inbox ──────────────────────────────────────────────────────────────
+  app.get('/api/inbox', (req, res) => {
+    res.json(db.getInboxMessages());
+  });
+
+  app.post('/api/inbox/generate', (req, res) => {
+    const limit = Number(req.body.limit) || 20;
+    replyEngine.generateBatch(limit)
+      .catch(err => console.error('generateBatch error:', err.message));
+    res.json({ ok: true });
+  });
+
+  app.post('/api/inbox/:messageId/dismiss', (req, res) => {
+    const id = Number(req.params.messageId);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
+    db.markSuggestionDismissed(id);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/inbox/:messageId/send', async (req, res) => {
+    const id = Number(req.params.messageId);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
+    const { body } = req.body;
+    if (!body || !String(body).trim()) return res.status(400).json({ error: 'body is required' });
+    const msg = db.getMessageWithContact(id);
+    if (!msg) return res.status(404).json({ error: 'Message not found' });
+    try {
+      await bridge.sendMessage(msg.phone, body);
+      db.insertMessage(msg.contact_id, 'out', body, Math.floor(Date.now() / 1000), `manual-${Date.now()}`);
+      db.markSuggestionUsed(id);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('Send message error:', err.message);
+      res.status(500).json({ error: 'Failed to send message' });
+    }
   });
 
   // ── Tasks ─────────────────────────────────────────────────────────────

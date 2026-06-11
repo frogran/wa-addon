@@ -163,4 +163,11 @@ describe('buildUserProfile', () => {
     const result = await buildUserProfile([{ body: 'Hi', contact_name: 'Bob', timestamp: 1 }], null);
     expect(result).toBeNull();
   });
+
+  test('includes existing profile in prompt when provided', async () => {
+    mockCreate.mockResolvedValue({ content: [{ text: 'Updated style.' }] });
+    await buildUserProfile([{ body: 'Noted', contact_name: 'Alice', timestamp: 1 }], 'Old style notes');
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.messages[0].content).toContain('Old style notes');
+  });
 });

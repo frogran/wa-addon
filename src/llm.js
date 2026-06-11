@@ -59,6 +59,7 @@ async function extractTasksBatch(messages) {
 }
 
 async function buildContactProfile(messages, existingProfile) {
+  if (!messages.length && !existingProfile) return null;
   const client = getClient();
   const existing = existingProfile && existingProfile.summary
     ? `\n\nExisting profile:\nRELATIONSHIP_SUMMARY:\n${existingProfile.summary}\n\nSTYLE_TO_CONTACT:\n${existingProfile.style}`
@@ -97,10 +98,10 @@ CATEGORY: <fan|colleague|press|family|other>`,
       messages: [{ role: 'user', content: `Message history:${existing}\n\n${history}` }],
     });
     const text = response.content[0].text;
-    const summary = (text.match(/RELATIONSHIP_SUMMARY:\s*([\s\S]*?)(?=\nSTYLE_TO_CONTACT:|$)/) || [])[1]?.trim() || '';
-    const style = (text.match(/STYLE_TO_CONTACT:\s*([\s\S]*?)(?=\nLANGUAGE:|$)/) || [])[1]?.trim() || '';
-    const language = (text.match(/LANGUAGE:\s*(\S+)/) || [])[1]?.toLowerCase() || 'en';
-    const category = (text.match(/CATEGORY:\s*(\S+)/) || [])[1]?.toLowerCase() || 'other';
+    const summary = (text.match(/RELATIONSHIP_SUMMARY:\s*([\s\S]*?)(?=\n+STYLE_TO_CONTACT:|$)/) || [])[1]?.trim() || '';
+    const style = (text.match(/STYLE_TO_CONTACT:\s*([\s\S]*?)(?=\n+LANGUAGE:|$)/) || [])[1]?.trim() || '';
+    const language = (text.match(/LANGUAGE:\s*([a-zA-Z]+)/) || [])[1]?.toLowerCase() || 'en';
+    const category = (text.match(/CATEGORY:\s*([a-zA-Z]+)/) || [])[1]?.toLowerCase() || 'other';
     if (!summary) return null;
     return { summary, style, language, category };
   } catch (err) {
@@ -110,6 +111,7 @@ CATEGORY: <fan|colleague|press|family|other>`,
 }
 
 async function buildUserProfile(outgoingMessages, existingProfile) {
+  if (!outgoingMessages.length) return null;
   const client = getClient();
   const existing = existingProfile ? `\n\nExisting style profile:\n${existingProfile}` : '';
   const sample = outgoingMessages.map(m => `To ${m.contact_name}: ${m.body}`).join('\n');

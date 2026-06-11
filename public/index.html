@@ -621,6 +621,7 @@
   <script>
     // ── Tab switching ───────────────────────────────────────────────────
     function showTab(name) {
+      if (name !== 'inbox' && inboxPoller) { clearInterval(inboxPoller); inboxPoller = null; }
       document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('nav a').forEach(el => el.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
@@ -1241,8 +1242,8 @@
         const chatEl = document.getElementById(`inbox-chat-${messageId}`);
         if (!chatEl) return;
         const msgs = (c.recent_messages || []).slice().reverse(); // oldest first
-        chatEl.innerHTML = msgs.map(m => `
-          <div class="msg-bubble ${m.direction}${m.direction === 'in' && msgs.indexOf(m) === msgs.length - 1 ? ' latest' : ''}" dir="auto">
+        chatEl.innerHTML = msgs.map((m, idx) => `
+          <div class="msg-bubble ${m.direction}${m.direction === 'in' && idx === msgs.length - 1 ? ' latest' : ''}" dir="auto">
             ${escHtml(m.body)}
           </div>`).join('');
       } catch {}

@@ -1139,7 +1139,8 @@
         return;
       }
 
-      const unanswered = c.inbox_muted ? 0 : (await fetch(`/api/inbox`).then(r=>r.json()).catch(()=>[])).filter(m => m.contact_id === id).length;
+      if (!inboxData.length) await refreshInboxList();
+      const unanswered = c.inbox_muted ? 0 : inboxData.filter(m => m.contact_id === id).length;
 
       if (activeContactId !== id) return;
       const langOptions = ['en', 'he', 'mixed'].map(l =>
@@ -1202,14 +1203,14 @@
           <div class="rs-field">
             <label>Messages to consider</label>
             <input type="number" id="rs-ctx-${id}" value="${Number(c.reply_context_messages) || 20}" min="5" max="50"
-              onchange="saveContactField(${id}, 'reply_context_messages', parseInt(this.value) || 20)">
+              onchange="saveContactField(${id}, 'reply_context_messages', Math.min(50, Math.max(5, parseInt(this.value) || 20)))"
           </div>
           <div class="rs-field">
             <label>Reply length</label>
             <div class="rs-btn-group">
               ${['auto','short','medium','long'].map(v => `
                 <button class="rs-btn${(c.reply_length||'auto')===v?' active':''}"
-                  onclick="setRsSingle(${id},'reply_length','${v}',this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+                  onclick="setRsSingle(${id},'reply_length','${v}',this,this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
             </div>
           </div>
           <div class="rs-field">
@@ -1217,7 +1218,7 @@
             <div class="rs-pill-group">
               ${['auto','casual','professional','warm','direct'].map(v => `
                 <button class="rs-pill${(c.reply_tone||'auto')===v?' active':''}"
-                  onclick="setRsSingle(${id},'reply_tone','${v}',this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+                  onclick="setRsSingle(${id},'reply_tone','${v}',this,this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
             </div>
           </div>
           <div class="rs-field">
@@ -1225,7 +1226,7 @@
             <div class="rs-btn-group">
               ${[['auto','Auto'],['en','English'],['he','עברית']].map(([v,l]) => `
                 <button class="rs-btn${(c.reply_language||'auto')===v?' active':''}"
-                  onclick="setRsSingle(${id},'reply_language','${v}',this.parentElement)">${l}</button>`).join('')}
+                  onclick="setRsSingle(${id},'reply_language','${v}',this,this.parentElement)">${l}</button>`).join('')}
             </div>
           </div>
           <div class="rs-field">
@@ -1233,7 +1234,7 @@
             <div class="rs-btn-group">
               ${['none','auto','frequent'].map(v => `
                 <button class="rs-btn${(c.reply_emoji||'auto')===v?' active':''}"
-                  onclick="setRsSingle(${id},'reply_emoji','${v}',this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+                  onclick="setRsSingle(${id},'reply_emoji','${v}',this,this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
             </div>
           </div>
           <div class="rs-toggle-row" style="border-top:1px solid #21262d;border-bottom:none;margin-top:4px">
@@ -1274,9 +1275,9 @@
       }
     }
 
-    function setRsSingle(contactId, field, value, container) {
+    function setRsSingle(contactId, field, value, btn, container) {
       container.querySelectorAll('.rs-btn, .rs-pill').forEach(b => b.classList.remove('active'));
-      event.target.classList.add('active');
+      btn.classList.add('active');
       saveContactField(contactId, field, value);
     }
 
@@ -1300,8 +1301,9 @@
       await saveContactField(contactId, 'reply_greeting', newVal);
     }
 
-    function openInboxFromContact(contactId) {
+    async function openInboxFromContact(contactId) {
       showTab('inbox');
+      if (!inboxData.length) await refreshInboxList();
       const msg = inboxData.find(m => m.contact_id === contactId);
       if (msg) openInboxPanel(msg.message_id);
     }

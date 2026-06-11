@@ -457,6 +457,104 @@
     }
     .inbox-dismiss-btn:hover { border-color: #f85149; color: #f85149; }
     .inbox-regen-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+    /* Reply settings section in Contacts panel */
+    .reply-settings-section { margin-top: 20px; }
+    .reply-settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .reply-settings-header h4 { font-size: 0.85em; font-weight: 600; color: #e6edf3; }
+    .reply-settings-header .rsh-sub { font-size: 0.75em; color: #8b949e; }
+    .rs-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #21262d;
+      margin-bottom: 12px;
+    }
+    .rs-toggle-label { font-size: 0.82em; color: #c9d1d9; }
+    .rs-toggle-sub { font-size: 0.75em; color: #8b949e; }
+    .toggle-switch {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .toggle-track {
+      width: 32px; height: 18px;
+      border-radius: 9px;
+      background: #21262d;
+      position: relative;
+      transition: background 0.2s;
+    }
+    .toggle-track.on { background: #238636; }
+    .toggle-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 2px; left: 2px;
+      transition: left 0.2s;
+    }
+    .toggle-track.on .toggle-thumb { left: 16px; }
+    .rs-field { margin-bottom: 12px; }
+    .rs-field label { display: block; font-size: 0.75em; color: #8b949e; margin-bottom: 4px; }
+    .rs-field input[type="number"] {
+      width: 80px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 5px 8px;
+      font-size: 0.875em;
+      font-family: inherit;
+    }
+    .rs-field input[type="number"]:focus { outline: none; border-color: #58a6ff; }
+    .rs-btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+    .rs-btn {
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.8em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .rs-btn.active { background: #1a3a2a; border-color: #3fb950; color: #3fb950; }
+    .rs-btn:hover:not(.active) { border-color: #8b949e; color: #c9d1d9; }
+    .rs-pill-group { display: flex; gap: 4px; flex-wrap: wrap; }
+    .rs-pill {
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 0.78em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .rs-pill.active { background: #1a3a2a; border-color: #3fb950; color: #3fb950; }
+    .rs-pill:hover:not(.active) { border-color: #8b949e; color: #c9d1d9; }
+    .inbox-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 0.8em;
+      color: #c9d1d9;
+      margin-bottom: 14px;
+    }
+    .inbox-badge:hover { border-color: #58a6ff; }
+    .inbox-badge .ib-dot { color: #f0883e; }
+    .inbox-badge .ib-link { color: #58a6ff; }
   </style>
 </head>
 <body>
@@ -1041,6 +1139,8 @@
         return;
       }
 
+      const unanswered = c.inbox_muted ? 0 : (await fetch(`/api/inbox`).then(r=>r.json()).catch(()=>[])).filter(m => m.contact_id === id).length;
+
       if (activeContactId !== id) return;
       const langOptions = ['en', 'he', 'mixed'].map(l =>
         `<option value="${l}"${c.language === l ? ' selected' : ''}>${l}</option>`
@@ -1055,6 +1155,12 @@
           <div class="panel-name" dir="auto">${escHtml(c.name || c.phone)}</div>
           <div class="panel-phone">${escHtml(c.phone || '')}</div>
         </div>
+        ${unanswered > 0 ? `
+        <div class="inbox-badge" onclick="openInboxFromContact(${id})">
+          <span class="ib-dot">●</span>
+          <span>${unanswered} unanswered message${unanswered > 1 ? 's' : ''}</span>
+          <span class="ib-link">→ Go to Inbox</span>
+        </div>` : ''}
         <button class="refresh-profile-btn" onclick="triggerContactRefresh(${id})">↻ Refresh profile</button>
         <div class="panel-field">
           <label>Language</label>
@@ -1076,6 +1182,70 @@
           <button class="save-btn" onclick="saveContactField(${id}, 'style_to_contact', document.getElementById('panel-style-${id}').value)">Save</button>
         </div>
         ${msgHtml ? `<div class="panel-messages"><h4>Recent messages</h4>${msgHtml}</div>` : ''}
+        <div class="reply-settings-section">
+          <div class="reply-settings-header">
+            <h4>Reply settings</h4>
+            <span class="rsh-sub">Overrides defaults for AI suggestions</span>
+          </div>
+          <div class="rs-toggle-row">
+            <div>
+              <div class="rs-toggle-label">Inbox suggestions</div>
+              <div class="rs-toggle-sub">Show this contact in Inbox</div>
+            </div>
+            <div class="toggle-switch" onclick="toggleInboxMuted(${id}, this)">
+              <div class="toggle-track${c.inbox_muted ? '' : ' on'}" id="rs-mute-track-${id}">
+                <div class="toggle-thumb"></div>
+              </div>
+              <span style="font-size:0.8em;color:#8b949e" id="rs-mute-label-${id}">${c.inbox_muted ? 'Off' : 'On'}</span>
+            </div>
+          </div>
+          <div class="rs-field">
+            <label>Messages to consider</label>
+            <input type="number" id="rs-ctx-${id}" value="${c.reply_context_messages || 20}" min="5" max="50"
+              onchange="saveContactField(${id}, 'reply_context_messages', parseInt(this.value) || 20)">
+          </div>
+          <div class="rs-field">
+            <label>Reply length</label>
+            <div class="rs-btn-group">
+              ${['auto','short','medium','long'].map(v => `
+                <button class="rs-btn${(c.reply_length||'auto')===v?' active':''}"
+                  onclick="setRsSingle(${id},'reply_length','${v}',this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+            </div>
+          </div>
+          <div class="rs-field">
+            <label>Tone</label>
+            <div class="rs-pill-group">
+              ${['auto','casual','professional','warm','direct'].map(v => `
+                <button class="rs-pill${(c.reply_tone||'auto')===v?' active':''}"
+                  onclick="setRsSingle(${id},'reply_tone','${v}',this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+            </div>
+          </div>
+          <div class="rs-field">
+            <label>Language</label>
+            <div class="rs-btn-group">
+              ${[['auto','Auto'],['en','English'],['he','עברית']].map(([v,l]) => `
+                <button class="rs-btn${(c.reply_language||'auto')===v?' active':''}"
+                  onclick="setRsSingle(${id},'reply_language','${v}',this.parentElement)">${l}</button>`).join('')}
+            </div>
+          </div>
+          <div class="rs-field">
+            <label>Emoji use</label>
+            <div class="rs-btn-group">
+              ${['none','auto','frequent'].map(v => `
+                <button class="rs-btn${(c.reply_emoji||'auto')===v?' active':''}"
+                  onclick="setRsSingle(${id},'reply_emoji','${v}',this.parentElement)">${v.charAt(0).toUpperCase()+v.slice(1)}</button>`).join('')}
+            </div>
+          </div>
+          <div class="rs-toggle-row" style="border-top:1px solid #21262d;border-bottom:none;margin-top:4px">
+            <div class="rs-toggle-label">Include greeting</div>
+            <div class="toggle-switch" onclick="toggleGreeting(${id}, this)">
+              <div class="toggle-track${c.reply_greeting ? ' on' : ''}" id="rs-greeting-track-${id}">
+                <div class="toggle-thumb"></div>
+              </div>
+              <span style="font-size:0.8em;color:#8b949e" id="rs-greeting-label-${id}">${c.reply_greeting ? 'On' : 'Off'}</span>
+            </div>
+          </div>
+        </div>
       `;
     }
 
@@ -1102,6 +1272,38 @@
       } catch (e) {
         console.warn('Refresh failed:', e.message);
       }
+    }
+
+    function setRsSingle(contactId, field, value, container) {
+      container.querySelectorAll('.rs-btn, .rs-pill').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      saveContactField(contactId, field, value);
+    }
+
+    async function toggleInboxMuted(contactId, toggleEl) {
+      const track = document.getElementById(`rs-mute-track-${contactId}`);
+      const label = document.getElementById(`rs-mute-label-${contactId}`);
+      const isOn = track.classList.contains('on');
+      const newMuted = isOn ? 1 : 0;
+      track.classList.toggle('on', !isOn);
+      label.textContent = isOn ? 'Off' : 'On';
+      await saveContactField(contactId, 'inbox_muted', newMuted);
+    }
+
+    async function toggleGreeting(contactId, toggleEl) {
+      const track = document.getElementById(`rs-greeting-track-${contactId}`);
+      const label = document.getElementById(`rs-greeting-label-${contactId}`);
+      const isOn = track.classList.contains('on');
+      const newVal = isOn ? 0 : 1;
+      track.classList.toggle('on', !isOn);
+      label.textContent = isOn ? 'Off' : 'On';
+      await saveContactField(contactId, 'reply_greeting', newVal);
+    }
+
+    function openInboxFromContact(contactId) {
+      showTab('inbox');
+      const msg = inboxData.find(m => m.contact_id === contactId);
+      if (msg) openInboxPanel(msg.message_id);
     }
 
     // ── Shared contacts ──────────────────────────────────────────────────

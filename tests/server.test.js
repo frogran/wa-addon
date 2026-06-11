@@ -458,6 +458,14 @@ describe('inbox routes', () => {
     expect(db.getSuggestions(messageId).status).toBe('dismissed');
   });
 
+  test('POST /api/inbox/:messageId/dismiss works for message with no prior suggestion row', async () => {
+    // messageId has no suggestion row at all — should still dismiss successfully
+    const res = await request(app).post(`/api/inbox/${messageId}/dismiss`);
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(db.getSuggestions(messageId).status).toBe('dismissed');
+  });
+
   test('POST /api/inbox/:messageId/send returns 400 when body is missing', async () => {
     const res = await request(app)
       .post(`/api/inbox/${messageId}/send`)

@@ -144,8 +144,10 @@ function createApp() {
   app.post('/api/inbox/:messageId/dismiss', (req, res) => {
     const id = Number(req.params.messageId);
     if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id must be a positive integer' });
-    const result = db.markSuggestionDismissed(id);
-    if (!result.changes) return res.status(404).json({ error: 'Suggestion not found' });
+    const msg = db.getMessageWithContact(id);
+    if (!msg) return res.status(404).json({ error: 'Message not found' });
+    db.ensureSuggestionRow(id, msg.contact_id);
+    db.markSuggestionDismissed(id);
     res.json({ ok: true });
   });
 

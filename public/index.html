@@ -1202,8 +1202,7 @@
           </div>
           <div class="rs-field">
             <label>Messages to consider</label>
-            <input type="number" id="rs-ctx-${id}" value="${Number(c.reply_context_messages) || 20}" min="5" max="50"
-              onchange="saveContactField(${id}, 'reply_context_messages', Math.min(50, Math.max(5, parseInt(this.value) || 20)))"
+            <input type="number" id="rs-ctx-${id}" value="${Number(c.reply_context_messages) || 20}" min="5" max="50" onchange="saveContactField(${id}, 'reply_context_messages', Math.min(50, Math.max(5, parseInt(this.value) || 20)))">
           </div>
           <div class="rs-field">
             <label>Reply length</label>

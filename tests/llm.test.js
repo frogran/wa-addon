@@ -171,3 +171,51 @@ describe('buildUserProfile', () => {
     expect(call.messages[0].content).toContain('Old style notes');
   });
 });
+
+describe('buildReplySuggestions', () => {
+  const { buildReplySuggestions } = require('../src/llm');
+  const defaultSettings = { length: 'auto', tone: 'auto', language: 'auto', emoji: 'auto', greeting: 1 };
+
+  beforeEach(() => Anthropic.mockReset());
+
+  test('returns null when messages array is empty', async () => {
+    const result = await buildReplySuggestions([], null, null, defaultSettings);
+    expect(result).toBeNull();
+  });
+
+  test('parses all three suggestions from Claude response', async () => {
+    Anthropic.prototype.messages = {
+      create: jest.fn().mockResolvedValue({
+        content: [{ text: 'SUGGESTION_1:\nSure thing!\n\nSUGGESTION_2:\nSounds good.\n\nSUGGESTION_3:\nAbsolutely!' }]
+      })
+    };
+    const messages = [{ direction: 'in', body: 'Hey!', timestamp: 1000 }];
+    const result = await buildReplySuggestions(messages, null, null, defaultSettings);
+    expect(result).toEqual(['Sure thing!', 'Sounds good.', 'Absolutely!']);
+  });
+
+  test('returns null on API error', async () => {
+    Anthropic.prototype.messages = {
+      create: jest.fn().mockRejectedValue(new Error('rate limit'))
+    };
+    const messages = [{ direction: 'in', body: 'Hey', timestamp: 1000 }];
+    const result = await buildReplySuggestions(messages, null, null, defaultSettings);
+    expect(result).toBeNull();
+  });
+
+  test('includes contact profile and user profile in prompt when provided', async () => {
+    let capturedSystem = '';
+    Anthropic.prototype.messages = {
+      create: jest.fn().mockImplementation(({ system }) => {
+        capturedSystem = system;
+        return Promise.resolve({ content: [{ text: 'SUGGESTION_1:\nA\n\nSUGGESTION_2:\nB\n\nSUGGESTION_3:\nC' }] });
+      })
+    };
+    const messages = [{ direction: 'in', body: 'Hi', timestamp: 1000 }];
+    const profile = { summary: 'Close friend', style: 'Very casual' };
+    const userProfile = 'Writes briefly, uses Hebrew often';
+    await buildReplySuggestions(messages, profile, userProfile, defaultSettings);
+    expect(capturedSystem).toContain('Close friend');
+    expect(capturedSystem).toContain('Writes briefly');
+  });
+});

@@ -137,4 +137,89 @@ Respond with a single prose profile (2-4 paragraphs). Be specific and concrete.`
   }
 }
 
-module.exports = { extractTasks, extractTasksBatch, buildContactProfile, buildUserProfile };
+async function buildReplySuggestions(messages, contactProfile, userProfile, settings) {
+  if (!messages.length) return null;
+  const client = getClient();
+
+  const history = messages.map(m =>
+    `[${m.direction === 'out' ? 'You' : 'Them'}] ${m.body}`
+  ).join('\n');
+
+  const profileSection = contactProfile && contactProfile.summary
+    ? `\n\nContact profile:\nRelationship: ${contactProfile.summary}\nYour style with them: ${contactProfile.style}`
+    : '';
+
+  const userSection = userProfile
+    ? `\n\nYour overall writing style:\n${userProfile}`
+    : '';
+
+  const lengthInstructions = {
+    auto: "Choose an appropriate length based on the message. Match the contact's conversational pace.",
+    short: 'Keep each reply to 1–2 sentences.',
+    medium: 'Keep each reply to one paragraph.',
+    long: 'Write a full, detailed paragraph response.',
+  };
+
+  const toneInstruction = settings.tone !== 'auto'
+    ? `Tone: ${settings.tone}.`
+    : 'Tone: match the established style from the profile.';
+
+  const langInstruction = settings.language === 'he'
+    ? 'Language: reply in Hebrew only.'
+    : settings.language === 'en'
+    ? 'Language: reply in English only.'
+    : "Language: match the contact's language or your established pattern with them.";
+
+  const emojiInstruction = settings.emoji === 'none'
+    ? 'Do not use any emoji.'
+    : settings.emoji === 'frequent'
+    ? 'Use emoji freely.'
+    : 'Use emoji naturally, matching the established style.';
+
+  const greetingInstruction = settings.greeting
+    ? 'Start with a natural greeting if appropriate.'
+    : 'Do not start with a greeting — get straight to the reply.';
+
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      system: `You are drafting WhatsApp reply suggestions on behalf of the user.
+
+You will be given the recent message history with a contact, their relationship profile, and the user's writing style.
+
+Write exactly 3 reply options. Each should be meaningfully different — not just paraphrases.
+Vary the angle: one might confirm/agree, one might ask a follow-up, one might be warmer or more direct.
+
+${toneInstruction}
+${langInstruction}
+Length: ${lengthInstructions[settings.length] || lengthInstructions.auto}
+${emojiInstruction}
+${greetingInstruction}
+
+Never contradict explicit instructions above, but otherwise match the user's established style.${profileSection}${userSection}
+
+Respond in this exact format:
+SUGGESTION_1:
+<text>
+
+SUGGESTION_2:
+<text>
+
+SUGGESTION_3:
+<text>`,
+      messages: [{ role: 'user', content: `Message history:\n\n${history}` }],
+    });
+    const text = response.content[0].text;
+    const s1 = (text.match(/SUGGESTION_1:\s*([\s\S]*?)(?=\n+SUGGESTION_2:|$)/) || [])[1]?.trim() || '';
+    const s2 = (text.match(/SUGGESTION_2:\s*([\s\S]*?)(?=\n+SUGGESTION_3:|$)/) || [])[1]?.trim() || '';
+    const s3 = (text.match(/SUGGESTION_3:\s*([\s\S]*?)(?=\n+$|$)/) || [])[1]?.trim() || '';
+    if (!s1) return null;
+    return [s1, s2, s3];
+  } catch (err) {
+    console.error('buildReplySuggestions error:', err.message);
+    return null;
+  }
+}
+
+module.exports = { extractTasks, extractTasksBatch, buildContactProfile, buildUserProfile, buildReplySuggestions };

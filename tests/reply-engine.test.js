@@ -77,3 +77,19 @@ test('generateBatch skips messages that already have pending or ready suggestion
   // LLM should not be called since it was already pending
   expect(llm.buildReplySuggestions).not.toHaveBeenCalled();
 });
+
+test('generateBatch respects the limit parameter', async () => {
+  llm.buildReplySuggestions.mockResolvedValue(['A', 'B', 'C']);
+  const contactId1 = db.upsertContact('+1', 'Bob');
+  const contactId2 = db.upsertContact('+2', 'Carol');
+  const contactId3 = db.upsertContact('+3', 'Dave');
+  db.insertMessage(contactId1, 'in', 'Hi', 1000, 'wa-5');
+  db.insertMessage(contactId2, 'in', 'Hey', 1001, 'wa-6');
+  db.insertMessage(contactId3, 'in', 'Hello', 1002, 'wa-7');
+
+  replyEngine.generateBatch(2); // only 2 of 3 should get pending rows
+
+  const inbox = db.getInboxMessages();
+  const pendingCount = inbox.filter(m => m.suggestion_status === 'pending').length;
+  expect(pendingCount).toBe(2);
+});

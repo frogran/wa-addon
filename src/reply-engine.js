@@ -4,8 +4,11 @@ const llm = require('./llm');
 async function generateForMessage(contactId, messageId) {
   const contact = db.getContactDetail(contactId);
   if (!contact) return;
+  db.ensureSuggestionRow(messageId, contactId);
   const allMessages = db.getContactMessages(contactId);
-  const messages = allMessages.slice(-contact.reply_context_messages);
+  const messages = contact.reply_context_messages > 0
+    ? allMessages.slice(-contact.reply_context_messages)
+    : [];
   const contactProfile = db.getContactProfile(contactId);
   const userProfile = db.getProfile();
   const settings = {

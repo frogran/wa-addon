@@ -297,15 +297,98 @@ function getInboundMessagesAfter(afterId, limit) {
 
 function getAllContacts() {
   return getDb().prepare(
-    'SELECT id, name, phone FROM contacts ORDER BY name ASC'
+    'SELECT id, name, phone, language, category FROM contacts ORDER BY name ASC'
   ).all();
 }
 
 function searchContacts(query) {
   const like = `%${query}%`;
   return getDb().prepare(
-    'SELECT id, name, phone FROM contacts WHERE name LIKE ? OR phone LIKE ? ORDER BY name ASC LIMIT 20'
+    'SELECT id, name, phone, language, category FROM contacts WHERE name LIKE ? OR phone LIKE ? ORDER BY name ASC LIMIT 20'
   ).all(like, like);
+}
+
+// ── Contact profile helpers ───────────────────────────────────────────────
+
+function getContactProfile(contactId) {
+  return getDb().prepare(
+    'SELECT relationship_summary AS summary, style_to_contact AS style, language, category FROM contacts WHERE id = ?'
+  ).get(contactId) || null;
+}
+
+function updateContactProfile(contactId, summary, style, language, category) {
+  getDb().prepare(
+    'UPDATE contacts SET relationship_summary = ?, style_to_contact = ?, language = ?, category = ? WHERE id = ?'
+  ).run(summary, style, language, category, contactId);
+}
+
+function patchContactProfile(contactId, updates) {
+  const allowed = ['relationship_summary', 'style_to_contact', 'language', 'category'];
+  const fields = Object.keys(updates).filter(k => allowed.includes(k));
+  if (!fields.length) return;
+  const sql = `UPDATE contacts SET ${fields.map(f => `${f} = ?`).join(', ')} WHERE id = ?`;
+  getDb().prepare(sql).run(...fields.map(f => updates[f]), contactId);
+}
+
+function getContactMessages(contactId) {
+  return getDb().prepare(
+    'SELECT direction, body, timestamp FROM messages WHERE contact_id = ? ORDER BY timestamp ASC'
+  ).all(contactId);
+}
+
+function getContactsToSeed(afterId, limit) {
+  return getDb().prepare(`
+    SELECT DISTINCT c.id, c.name, c.phone
+    FROM contacts c
+    INNER JOIN messages m ON m.contact_id = c.id
+    WHERE c.id > ?
+    ORDER BY c.id ASC
+    LIMIT ?
+  `).all(afterId, limit);
+}
+
+function getContactDetail(contactId) {
+  const contact = getDb().prepare(
+    'SELECT id, name, phone, category, language, relationship_summary, style_to_contact FROM contacts WHERE id = ?'
+  ).get(contactId);
+  if (!contact) return null;
+  contact.recent_messages = getDb().prepare(
+    'SELECT direction, body, timestamp FROM messages WHERE contact_id = ? ORDER BY id DESC LIMIT 5'
+  ).all(contactId);
+  return contact;
+}
+
+function getContactInboundCount(contactId) {
+  return getDb().prepare(
+    "SELECT COUNT(*) AS n FROM messages WHERE contact_id = ? AND direction = 'in'"
+  ).get(contactId).n;
+}
+
+// ── User profile helpers ──────────────────────────────────────────────────
+
+function getProfile() {
+  return getDb().prepare('SELECT * FROM user_profile WHERE id = 1').get();
+}
+
+function updateProfile(globalStyle) {
+  getDb().prepare(
+    'UPDATE user_profile SET global_style = ?, updated_at = unixepoch() WHERE id = 1'
+  ).run(globalStyle);
+}
+
+function getOutgoingMessagesSample(limit) {
+  return getDb().prepare(`
+    SELECT m.body, c.name AS contact_name, m.timestamp
+    FROM messages m
+    JOIN contacts c ON c.id = m.contact_id
+    WHERE m.direction = 'out'
+    ORDER BY m.id DESC
+    LIMIT ?
+  `).all(limit);
+}
+
+function getOutboundCount() {
+  return getDb().prepare("SELECT COUNT(*) AS n FROM messages WHERE direction = 'out'").get().n;
 }
 
 module.exports = {
@@ -319,4 +402,7 @@ module.exports = {
   createSharedContact, getLastMessagesFromContact, getAllSharedContacts,
   getSetting, setSetting,
   countInboundMessages, getInboundMessagesAfter,
+  getContactProfile, updateContactProfile, patchContactProfile,
+  getContactMessages, getContactsToSeed, getContactDetail, getContactInboundCount,
+  getProfile, updateProfile, getOutgoingMessagesSample, getOutboundCount,
 };

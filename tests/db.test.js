@@ -340,3 +340,117 @@ describe('backfill helpers', () => {
     expect(bodies).toEqual(['Second msg', 'Third msg']);
   });
 });
+
+describe('contact profile helpers', () => {
+  let contactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    contactId = db.upsertContact('+972501234567', 'Test Fan');
+  });
+
+  afterEach(() => db.close());
+
+  test('updateContactProfile / getContactProfile round-trip', () => {
+    db.updateContactProfile(contactId, 'Big fan', 'Casual', 'he', 'fan');
+    const p = db.getContactProfile(contactId);
+    expect(p.summary).toBe('Big fan');
+    expect(p.style).toBe('Casual');
+    expect(p.language).toBe('he');
+    expect(p.category).toBe('fan');
+  });
+
+  test('getContactProfile returns null for contact with no profile', () => {
+    const p = db.getContactProfile(contactId);
+    expect(p.summary).toBeNull();
+    expect(p.style).toBeNull();
+  });
+
+  test('patchContactProfile updates only specified fields', () => {
+    db.updateContactProfile(contactId, 'Original summary', 'Original style', 'en', 'other');
+    db.patchContactProfile(contactId, { relationship_summary: 'Updated summary' });
+    const p = db.getContactProfile(contactId);
+    expect(p.summary).toBe('Updated summary');
+    expect(p.style).toBe('Original style');
+  });
+
+  test('getContactMessages returns messages in chronological order', () => {
+    db.insertMessage(contactId, 'in', 'First', 1000, 'wa-1');
+    db.insertMessage(contactId, 'out', 'Second', 2000, 'wa-2');
+    db.insertMessage(contactId, 'in', 'Third', 3000, 'wa-3');
+    const msgs = db.getContactMessages(contactId);
+    expect(msgs).toHaveLength(3);
+    expect(msgs[0].body).toBe('First');
+    expect(msgs[1].direction).toBe('out');
+    expect(msgs[2].body).toBe('Third');
+  });
+
+  test('getContactsToSeed returns only contacts with at least one message', () => {
+    db.upsertContact('+972509999999', 'No Messages');
+    db.insertMessage(contactId, 'in', 'hi', 1000, 'wa-1');
+    const contacts = db.getContactsToSeed(0, 99);
+    expect(contacts).toHaveLength(1);
+    expect(contacts[0].id).toBe(contactId);
+  });
+
+  test('getContactsToSeed respects afterId filter', () => {
+    const id2 = db.upsertContact('+972502222222', 'Second');
+    db.insertMessage(contactId, 'in', 'hi', 1000, 'wa-1');
+    db.insertMessage(id2, 'in', 'hi', 1001, 'wa-2');
+    const contacts = db.getContactsToSeed(contactId, 99);
+    expect(contacts).toHaveLength(1);
+    expect(contacts[0].id).toBe(id2);
+  });
+
+  test('getContactDetail returns full row with recent messages', () => {
+    db.updateContactProfile(contactId, 'Big fan', 'Casual', 'he', 'fan');
+    db.insertMessage(contactId, 'in', 'Hello', 1000, 'wa-1');
+    const detail = db.getContactDetail(contactId);
+    expect(detail.name).toBe('Test Fan');
+    expect(detail.relationship_summary).toBe('Big fan');
+    expect(detail.recent_messages).toHaveLength(1);
+    expect(detail.recent_messages[0].body).toBe('Hello');
+  });
+
+  test('getContactInboundCount counts only inbound', () => {
+    db.insertMessage(contactId, 'in', 'hi', 1000, 'wa-1');
+    db.insertMessage(contactId, 'in', 'bye', 2000, 'wa-2');
+    db.insertMessage(contactId, 'out', 'ok', 3000, 'wa-3');
+    expect(db.getContactInboundCount(contactId)).toBe(2);
+  });
+});
+
+describe('user profile and outbound helpers', () => {
+  let contactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    contactId = db.upsertContact('+972501234567', 'Alice');
+  });
+
+  afterEach(() => db.close());
+
+  test('updateProfile / getProfile round-trip', () => {
+    db.updateProfile('Writes concisely.');
+    const p = db.getProfile();
+    expect(p.global_style).toBe('Writes concisely.');
+    expect(p.updated_at).toBeGreaterThan(0);
+  });
+
+  test('getOutgoingMessagesSample returns only outbound messages with contact name', () => {
+    db.insertMessage(contactId, 'in', 'inbound msg', 1000, 'wa-1');
+    db.insertMessage(contactId, 'out', 'outbound msg', 2000, 'wa-2');
+    const msgs = db.getOutgoingMessagesSample(10);
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0].body).toBe('outbound msg');
+    expect(msgs[0].contact_name).toBe('Alice');
+  });
+
+  test('getOutboundCount counts all outbound messages', () => {
+    const id2 = db.upsertContact('+972502222222', 'Bob');
+    db.insertMessage(contactId, 'out', 'a', 1000, 'wa-1');
+    db.insertMessage(id2, 'out', 'b', 2000, 'wa-2');
+    db.insertMessage(contactId, 'in', 'c', 3000, 'wa-3');
+    expect(db.getOutboundCount()).toBe(2);
+  });
+});

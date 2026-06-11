@@ -1,6 +1,6 @@
 jest.mock('@anthropic-ai/sdk');
 const Anthropic = require('@anthropic-ai/sdk');
-const { extractTasks, extractTasksBatch, buildContactProfile, buildUserProfile } = require('../src/llm');
+const { extractTasks, extractTasksBatch, buildContactProfile, buildUserProfile, buildReplySuggestions } = require('../src/llm');
 
 describe('extractTasks', () => {
   let mockCreate;
@@ -173,7 +173,6 @@ describe('buildUserProfile', () => {
 });
 
 describe('buildReplySuggestions', () => {
-  const { buildReplySuggestions } = require('../src/llm');
   const defaultSettings = { length: 'auto', tone: 'auto', language: 'auto', emoji: 'auto', greeting: 1 };
 
   beforeEach(() => Anthropic.mockReset());

@@ -183,7 +183,7 @@ async function buildReplySuggestions(messages, contactProfile, userProfile, sett
   try {
     const response = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: `You are drafting WhatsApp reply suggestions on behalf of the user.
 
 You will be given the recent message history with a contact, their relationship profile, and the user's writing style.
@@ -214,7 +214,7 @@ SUGGESTION_3:
     const s1 = (text.match(/SUGGESTION_1:\s*([\s\S]*?)(?=\n+SUGGESTION_2:|$)/) || [])[1]?.trim() || '';
     const s2 = (text.match(/SUGGESTION_2:\s*([\s\S]*?)(?=\n+SUGGESTION_3:|$)/) || [])[1]?.trim() || '';
     const s3 = (text.match(/SUGGESTION_3:\s*([\s\S]*?)(?=\n+$|$)/) || [])[1]?.trim() || '';
-    if (!s1) return null;
+    if (!s1 || !s2 || !s3) return null;
     return [s1, s2, s3];
   } catch (err) {
     console.error('buildReplySuggestions error:', err.message);

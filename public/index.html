@@ -1204,7 +1204,7 @@
           <div class="inbox-compose-actions">
             <button class="inbox-send-btn" onclick="sendInboxReply(${messageId}, ${msg.contact_id})">Send via WhatsApp</button>
             <button class="inbox-dismiss-btn" onclick="dismissInboxMessage(${messageId})">Dismiss</button>
-            <button class="inbox-regen-btn" onclick="regenInboxSuggestions(${messageId}, ${msg.contact_id})">↻</button>
+            <button class="inbox-regen-btn" onclick="regenInboxSuggestions(${messageId})">↻</button>
           </div>
         </div>`;
 
@@ -1221,16 +1221,16 @@
       return [msg.suggestion_1, msg.suggestion_2, msg.suggestion_3]
         .filter(Boolean)
         .map((s, i) => `
-          <div class="suggestion-block" onclick="selectSuggestion(${messageId}, this, ${escHtml(JSON.stringify(s))})">
+          <div class="suggestion-block" data-text="${escHtml(s)}" onclick="selectSuggestion(${messageId}, this)">
             <div class="suggestion-num">${i + 1}</div>
             ${escHtml(s)}
           </div>`).join('');
     }
 
-    function selectSuggestion(messageId, el, text) {
+    function selectSuggestion(messageId, el) {
       document.querySelectorAll(`#inbox-suggestions-${messageId} .suggestion-block`).forEach(b => b.classList.remove('selected'));
       el.classList.add('selected');
-      document.getElementById(`inbox-reply-${messageId}`).value = text;
+      document.getElementById(`inbox-reply-${messageId}`).value = el.dataset.text;
     }
 
     async function loadInboxChat(contactId, messageId) {
@@ -1304,7 +1304,7 @@
       document.getElementById('inbox-panel').innerHTML = '<div class="inbox-panel-placeholder">Contact muted from Inbox.</div>';
     }
 
-    async function regenInboxSuggestions(messageId, contactId) {
+    async function regenInboxSuggestions(messageId) {
       try {
         await fetch('/api/inbox/generate', {
           method: 'POST',
@@ -1336,7 +1336,7 @@
         // Re-render open panel if suggestions arrived
         if (activeInboxMessageId !== null) {
           const msg = inboxData.find(m => m.message_id === activeInboxMessageId);
-          if (msg && msg.suggestion_status === 'ready') {
+          if (msg && (msg.suggestion_status === 'ready' || msg.suggestion_status === 'failed')) {
             const sugEl = document.getElementById(`inbox-suggestions-${activeInboxMessageId}`);
             if (sugEl) sugEl.innerHTML = renderSuggestions(msg, activeInboxMessageId);
           }

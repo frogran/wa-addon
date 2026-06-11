@@ -325,14 +325,17 @@ function updateContactProfile(contactId, summary, style, language, category) {
 function patchContactProfile(contactId, updates) {
   const allowed = ['relationship_summary', 'style_to_contact', 'language', 'category'];
   const fields = Object.keys(updates).filter(k => allowed.includes(k));
-  if (!fields.length) return;
+  if (!fields.length) {
+    console.warn('patchContactProfile: no valid fields in updates', Object.keys(updates));
+    return;
+  }
   const sql = `UPDATE contacts SET ${fields.map(f => `${f} = ?`).join(', ')} WHERE id = ?`;
   getDb().prepare(sql).run(...fields.map(f => updates[f]), contactId);
 }
 
 function getContactMessages(contactId) {
   return getDb().prepare(
-    'SELECT direction, body, timestamp FROM messages WHERE contact_id = ? ORDER BY timestamp ASC'
+    'SELECT direction, body, timestamp FROM messages WHERE contact_id = ? ORDER BY timestamp ASC, id ASC'
   ).all(contactId);
 }
 
@@ -367,7 +370,7 @@ function getContactInboundCount(contactId) {
 // ── User profile helpers ──────────────────────────────────────────────────
 
 function getProfile() {
-  return getDb().prepare('SELECT * FROM user_profile WHERE id = 1').get();
+  return getDb().prepare('SELECT id, global_style, updated_at FROM user_profile WHERE id = 1').get();
 }
 
 function updateProfile(globalStyle) {

@@ -3,7 +3,7 @@
 function extractPhones(text) {
   // Capture candidates: optional leading +, then digit or (, then 5–14 chars of
   // digits/spaces/parens/dashes/dots, ending on a digit.
-  const raw = text.match(/\+?[\d(][\d\s()\-.]{5,14}\d/g) || [];
+  const raw = text.match(/\+?[\d(][\d\s()\-.]{5,18}\d/g) || [];
   return [...new Set(
     raw
       .map(s => s.replace(/[\s()\-.]/g, ''))   // normalise: strip separators

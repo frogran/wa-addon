@@ -95,6 +95,21 @@ function init(dbPath) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_contacts_phone ON shared_contacts(phone);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_message_body ON tasks(message_id, body);
 
+    CREATE TABLE IF NOT EXISTS extracted_contacts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone      TEXT,
+      email      TEXT,
+      shared_by  INTEGER NOT NULL REFERENCES contacts(id),
+      message_id INTEGER REFERENCES messages(id),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_extracted_contacts_phone
+      ON extracted_contacts(phone) WHERE phone IS NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_extracted_contacts_email
+      ON extracted_contacts(email) WHERE email IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS user_profile (
       id           INTEGER PRIMARY KEY CHECK(id = 1),
       global_style TEXT,
@@ -276,12 +291,35 @@ function getLastMessagesFromContact(contactId, limit) {
 
 function getAllSharedContacts() {
   return getDb().prepare(`
-    SELECT sc.id, sc.phone, sc.name, sc.context_before, sc.created_at,
-           c.name AS shared_by_name, c.phone AS shared_by_phone
-    FROM shared_contacts sc
-    JOIN contacts c ON c.id = sc.shared_by
-    ORDER BY sc.created_at DESC
+    SELECT * FROM (
+      SELECT sc.id, sc.phone, NULL AS email, sc.name, sc.context_before, sc.created_at,
+             'vcard' AS source,
+             c.name AS shared_by_name, c.phone AS shared_by_phone
+      FROM shared_contacts sc
+      JOIN contacts c ON c.id = sc.shared_by
+      UNION ALL
+      SELECT ec.id, ec.phone, ec.email, NULL AS name, NULL AS context_before, ec.created_at,
+             'text' AS source,
+             c.name AS shared_by_name, c.phone AS shared_by_phone
+      FROM extracted_contacts ec
+      JOIN contacts c ON c.id = ec.shared_by
+    )
+    ORDER BY created_at DESC
   `).all();
+}
+
+function createExtractedPhone(phone, sharedBy, messageId = null) {
+  const result = getDb().prepare(
+    'INSERT OR IGNORE INTO extracted_contacts (phone, shared_by, message_id) VALUES (?, ?, ?)'
+  ).run(phone, sharedBy, messageId);
+  return result.changes === 0 ? null : result.lastInsertRowid;
+}
+
+function createExtractedEmail(email, sharedBy, messageId = null) {
+  const result = getDb().prepare(
+    'INSERT OR IGNORE INTO extracted_contacts (email, shared_by, message_id) VALUES (?, ?, ?)'
+  ).run(email, sharedBy, messageId);
+  return result.changes === 0 ? null : result.lastInsertRowid;
 }
 
 // ── Generic settings helpers ──────────────────────────────────────────────
@@ -448,6 +486,10 @@ function getInboxMessages() {
         WHERE m2.contact_id = c.id AND m2.direction = 'in'
       )
       AND (rs.status IS NULL OR rs.status NOT IN ('used', 'dismissed'))
+      AND NOT EXISTS (
+        SELECT 1 FROM messages m3
+        WHERE m3.contact_id = c.id AND m3.direction = 'out' AND m3.id > m.id
+      )
     ORDER BY m.timestamp DESC, m.id DESC
   `).all();
 }
@@ -518,6 +560,7 @@ module.exports = {
   getAllContacts, searchContacts,
   createTask, getPendingTasks, markTaskDone,
   createSharedContact, getLastMessagesFromContact, getAllSharedContacts,
+  createExtractedPhone, createExtractedEmail,
   getSetting, setSetting,
   countInboundMessages, getInboundMessagesAfter,
   getContactProfile, updateContactProfile, patchContactProfile,

@@ -476,6 +476,73 @@ describe('inbox and reply suggestion helpers', () => {
   });
 });
 
+// ── extracted_contacts helpers ────────────────────────────────────────────
+
+describe('extracted_contacts helpers', () => {
+  let contactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    contactId = db.upsertContact('+972501234567', 'Tester');
+  });
+
+  afterEach(() => db.close());
+
+  test('createExtractedPhone returns a numeric id', () => {
+    const id = db.createExtractedPhone('+972509999999', contactId);
+    expect(typeof id).toBe('number');
+    expect(id).toBeGreaterThan(0);
+  });
+
+  test('createExtractedPhone returns null on duplicate phone', () => {
+    db.createExtractedPhone('+972509999999', contactId);
+    const id2 = db.createExtractedPhone('+972509999999', contactId);
+    expect(id2).toBeNull();
+  });
+
+  test('createExtractedEmail returns a numeric id', () => {
+    const id = db.createExtractedEmail('hello@example.com', contactId);
+    expect(typeof id).toBe('number');
+    expect(id).toBeGreaterThan(0);
+  });
+
+  test('createExtractedEmail returns null on duplicate email', () => {
+    db.createExtractedEmail('hello@example.com', contactId);
+    const id2 = db.createExtractedEmail('hello@example.com', contactId);
+    expect(id2).toBeNull();
+  });
+
+  test('getAllSharedContacts includes extracted phone with source=text', () => {
+    db.createExtractedPhone('+972509999999', contactId);
+    const rows = db.getAllSharedContacts();
+    const row = rows.find(r => r.source === 'text' && r.phone === '+972509999999');
+    expect(row).toBeDefined();
+    expect(row.shared_by_name).toBe('Tester');
+  });
+
+  test('getAllSharedContacts includes extracted email with source=text', () => {
+    db.createExtractedEmail('hello@example.com', contactId);
+    const rows = db.getAllSharedContacts();
+    const row = rows.find(r => r.source === 'text' && r.email === 'hello@example.com');
+    expect(row).toBeDefined();
+  });
+});
+
+// ── getInboxMessages outbound filter ──────────────────────────────────────
+
+describe('getInboxMessages outbound filter', () => {
+  beforeEach(() => db.init(':memory:'));
+  afterEach(() => db.close());
+
+  test('excludes contact when outbound message follows latest inbound', () => {
+    const cId = db.upsertContact('+10000000099', 'Reply Test');
+    db.insertMessage(cId, 'in', 'hello', 1000, 'wa_in_reply_test');
+    db.insertMessage(cId, 'out', 'hi back', 2000, 'wa_out_reply_test');
+    const rows = db.getInboxMessages();
+    expect(rows.find(r => r.contact_id === cId)).toBeUndefined();
+  });
+});
+
 describe('user profile and outbound helpers', () => {
   let contactId;
 

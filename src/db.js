@@ -324,6 +324,22 @@ function createExtractedEmail(email, sharedBy, messageId = null) {
   return result.changes === 0 ? null : result.lastInsertRowid;
 }
 
+function deleteExtractedContact(id) {
+  const result = getDb().prepare('DELETE FROM extracted_contacts WHERE id = ?').run(id);
+  return result.changes;
+}
+
+function deleteSharedContact(id) {
+  const result = getDb().prepare('DELETE FROM shared_contacts WHERE id = ?').run(id);
+  return result.changes;
+}
+
+function getAllMessagesForExtraction() {
+  return getDb().prepare(
+    "SELECT id, contact_id, body FROM messages WHERE body IS NOT NULL AND body != ''"
+  ).all();
+}
+
 // ── Generic settings helpers ──────────────────────────────────────────────
 
 function getSetting(key) {
@@ -563,6 +579,7 @@ module.exports = {
   createTask, getPendingTasks, markTaskDone,
   createSharedContact, getLastMessagesFromContact, getAllSharedContacts,
   createExtractedPhone, createExtractedEmail,
+  deleteExtractedContact, deleteSharedContact, getAllMessagesForExtraction,
   getSetting, setSetting,
   countInboundMessages, getInboundMessagesAfter,
   getContactProfile, updateContactProfile, patchContactProfile,

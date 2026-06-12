@@ -594,3 +594,47 @@ describe('user profile and outbound helpers', () => {
     expect(db.getOutboundCount()).toBe(2);
   });
 });
+
+// ── Leads delete helpers ──────────────────────────────────────────────────
+
+describe('Leads delete helpers', () => {
+  let contactId;
+
+  beforeEach(() => {
+    db.init(':memory:');
+    contactId = db.upsertContact('+972501234567', 'Tester');
+  });
+
+  afterEach(() => db.close());
+
+  test('deleteExtractedContact removes the row and returns 1', () => {
+    const id = db.createExtractedPhone('+972509999999', contactId);
+    expect(db.deleteExtractedContact(id)).toBe(1);
+    expect(db.getAllSharedContacts().find(r => r.phone === '+972509999999')).toBeUndefined();
+  });
+
+  test('deleteExtractedContact returns 0 for unknown id', () => {
+    expect(db.deleteExtractedContact(99999)).toBe(0);
+  });
+
+  test('deleteSharedContact removes the row and returns 1', () => {
+    const id = db.createSharedContact('+972508888888', 'Name', contactId);
+    expect(db.deleteSharedContact(id)).toBe(1);
+    expect(db.getAllSharedContacts().find(r => r.phone === '+972508888888')).toBeUndefined();
+  });
+
+  test('deleteSharedContact returns 0 for unknown id', () => {
+    expect(db.deleteSharedContact(99999)).toBe(0);
+  });
+
+  test('getAllMessagesForExtraction returns all messages with non-empty body', () => {
+    const cId = db.upsertContact('+9720001', 'A');
+    db.insertMessage(cId, 'in',  'hello', 1000, 'wa_ext_1');
+    db.insertMessage(cId, 'out', 'hi',    2000, 'wa_ext_2');
+    const rows = db.getAllMessagesForExtraction();
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    expect(rows[0]).toHaveProperty('id');
+    expect(rows[0]).toHaveProperty('contact_id');
+    expect(rows[0]).toHaveProperty('body');
+  });
+});

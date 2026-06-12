@@ -1362,6 +1362,7 @@
       const btn = e.target.closest('button.delete-lead-btn');
       if (!btn) return;
       const item = btn.closest('[data-lead-id]');
+      if (!item) return;
       const id = item.dataset.leadId;
       const source = item.dataset.leadSource;
       try {

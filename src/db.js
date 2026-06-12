@@ -337,6 +337,7 @@ function deleteSharedContact(id) {
 }
 
 function getAllMessagesForExtraction() {
+  // includes outbound messages intentionally — any mention in chat history is a potential lead
   return getDb().prepare(
     "SELECT id, contact_id, body FROM messages WHERE body IS NOT NULL AND body != ''"
   ).all();

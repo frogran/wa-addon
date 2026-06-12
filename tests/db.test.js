@@ -541,6 +541,23 @@ describe('getInboxMessages outbound filter', () => {
     const rows = db.getInboxMessages();
     expect(rows.find(r => r.contact_id === cId)).toBeUndefined();
   });
+
+  test('keeps contact when outbound message precedes latest inbound (contact replied after us)', () => {
+    const cId = db.upsertContact('+10000000098', 'Reply Before');
+    db.insertMessage(cId, 'out', 'hey there', 1000, 'wa_out_first');
+    db.insertMessage(cId, 'in', 'hey back!', 2000, 'wa_in_after_out');
+    const rows = db.getInboxMessages();
+    expect(rows.find(r => r.contact_id === cId)).toBeDefined();
+  });
+
+  test('contact reappears after new inbound following a prior outbound', () => {
+    const cId = db.upsertContact('+10000000097', 'Reappear Test');
+    db.insertMessage(cId, 'in', 'first message', 1000, 'wa_in_first_2');
+    db.insertMessage(cId, 'out', 'my reply', 2000, 'wa_out_second');
+    db.insertMessage(cId, 'in', 'their follow-up', 3000, 'wa_in_third');
+    const rows = db.getInboxMessages();
+    expect(rows.find(r => r.contact_id === cId)).toBeDefined();
+  });
 });
 
 describe('user profile and outbound helpers', () => {

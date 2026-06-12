@@ -3,6 +3,7 @@ const qrcode = require('qrcode-terminal');
 const db = require('./db');
 const llm = require('./llm');
 const contactIntel = require('./contact-intel');
+const { extractPhones, extractEmails } = require('./extract');
 
 let client = null;
 let currentQr = null;
@@ -85,6 +86,10 @@ function init() {
         llm.extractTasks(msg.body)
           .then((tasks) => tasks.forEach((body) => db.createTask(contactId, msgId, body)))
           .catch((err) => console.error('Task extraction error:', err.message));
+
+        // Extract phone numbers and emails mentioned in plain text
+        extractPhones(msg.body).forEach(phone => db.createExtractedPhone(phone, contactId, msgId));
+        extractEmails(msg.body).forEach(email => db.createExtractedEmail(email, contactId, msgId));
       }
 
       // Refresh contact profile every 5th inbound message from this contact
@@ -105,12 +110,24 @@ function init() {
     }
   });
 
+  client.on('message_create', async (msg) => {
+    if (!msg.fromMe) return;
+    if (!msg.body) return;
+    try {
+      const contact = await msg.getContact();
+      const contactId = db.upsertContact(msg.to, contact.pushname || contact.name || msg.to);
+      db.insertMessage(contactId, 'out', msg.body, Math.floor(msg.timestamp), msg.id.id);
+    } catch (err) {
+      console.error('Error handling outbound message:', err.message);
+    }
+  });
+
   client.initialize();
 }
 
 async function sendMessage(phone, body) {
   if (!client) throw new Error('WhatsApp client not initialized');
-  await client.sendMessage(phone, body);
+  return client.sendMessage(phone, body);
 }
 
 function getQr() {

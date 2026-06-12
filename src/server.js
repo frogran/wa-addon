@@ -159,8 +159,9 @@ function createApp() {
     const msg = db.getMessageWithContact(id);
     if (!msg) return res.status(404).json({ error: 'Message not found' });
     try {
-      await bridge.sendMessage(msg.phone, body);
-      db.insertMessage(msg.contact_id, 'out', body, Math.floor(Date.now() / 1000), `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      const sentMsg = await bridge.sendMessage(msg.phone, body);
+      const waId = sentMsg?.id?.id || `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      db.insertMessage(msg.contact_id, 'out', body, Math.floor(Date.now() / 1000), waId);
       db.markSuggestionUsed(id);
       res.json({ ok: true });
     } catch (err) {

@@ -309,6 +309,7 @@ function getAllSharedContacts() {
 }
 
 function createExtractedPhone(phone, sharedBy, messageId = null) {
+  if (!phone) return null;
   const result = getDb().prepare(
     'INSERT OR IGNORE INTO extracted_contacts (phone, shared_by, message_id) VALUES (?, ?, ?)'
   ).run(phone, sharedBy, messageId);
@@ -316,6 +317,7 @@ function createExtractedPhone(phone, sharedBy, messageId = null) {
 }
 
 function createExtractedEmail(email, sharedBy, messageId = null) {
+  if (!email) return null;
   const result = getDb().prepare(
     'INSERT OR IGNORE INTO extracted_contacts (email, shared_by, message_id) VALUES (?, ?, ?)'
   ).run(email, sharedBy, messageId);

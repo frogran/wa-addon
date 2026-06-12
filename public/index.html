@@ -572,6 +572,7 @@
     <a data-tab="inbox"    onclick="showTab('inbox')"    class="active">Inbox</a>
     <a data-tab="tasks"    onclick="showTab('tasks')">Tasks</a>
     <a data-tab="schedule" onclick="showTab('schedule')">Schedule</a>
+    <a data-tab="leads"    onclick="showTab('leads')">Leads</a>
     <a data-tab="contacts" onclick="showTab('contacts')">Contacts</a>
     <a data-tab="settings" onclick="showTab('settings')">Settings</a>
   </nav>
@@ -637,6 +638,17 @@
 
   </div>
 
+  <!-- Leads tab -->
+  <div id="tab-leads" class="tab">
+    <div style="display:flex;align-items:center;gap:12px;padding:0 0 12px">
+      <span id="leads-count" style="font-size:0.85em;color:#8b949e">0 leads</span>
+      <button type="button" id="leads-extract-btn" onclick="extractLeadsHistory()" style="background:none;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:5px 12px;font-size:0.82em;cursor:pointer;font-family:inherit">Extract from History</button>
+    </div>
+    <div class="msg-list" id="leads-list">
+      <p class="empty-state">No contacts shared or extracted yet.</p>
+    </div>
+  </div>
+
   <!-- Contacts tab -->
   <div id="tab-contacts" class="tab">
     <div class="contacts-layout">
@@ -648,13 +660,6 @@
       </div>
       <div class="contacts-panel" id="contacts-panel">
         <p class="panel-placeholder">Select a contact to view their profile.</p>
-      </div>
-    </div>
-    <hr class="panel-divider">
-    <div class="card" style="margin-top:0">
-      <h3>Shared &amp; Extracted Contacts</h3>
-      <div class="msg-list" id="shared-contacts-list">
-        <p class="empty-state">No contacts shared or extracted yet.</p>
       </div>
     </div>
   </div>
@@ -734,7 +739,8 @@
       }
       if (name === 'tasks') refreshTasksList();
       if (name === 'settings') { pollBackfillStatus(); pollIntelStatus(); }
-      if (name === 'contacts') { refreshContactList(''); refreshSharedContacts(); }
+      if (name === 'leads') refreshLeadsList();
+      if (name === 'contacts') refreshContactList('');
       if (name === 'inbox') { refreshInboxList().then(() => { triggerInboxGenerate(); startInboxPolling(); }); }
     }
 
@@ -1307,9 +1313,10 @@
       if (msg) openInboxPanel(msg.message_id);
     }
 
-    // ── Shared contacts ──────────────────────────────────────────────────
-    async function refreshSharedContacts() {
-      const list = document.getElementById('shared-contacts-list');
+    // ── Leads ────────────────────────────────────────────────────────────
+    async function refreshLeadsList() {
+      const list = document.getElementById('leads-list');
+      const countEl = document.getElementById('leads-count');
       let rows;
       try {
         rows = await fetch('/api/shared-contacts').then(r => r.json());
@@ -1317,6 +1324,7 @@
         return;
       }
       if (!Array.isArray(rows)) return;
+      if (countEl) countEl.textContent = rows.length + ' lead' + (rows.length !== 1 ? 's' : '');
       if (!rows.length) {
         list.innerHTML = '<p class="empty-state">No contacts shared or extracted yet.</p>';
         return;
@@ -1334,7 +1342,7 @@
           ? `<span style="font-size:0.68em;background:#1f3a2a;color:#3fb950;padding:1px 6px;border-radius:3px;margin-left:6px">vCard</span>`
           : `<span style="font-size:0.68em;background:#1a2536;color:#58a6ff;padding:1px 6px;border-radius:3px;margin-left:6px">text</span>`;
         return `
-        <div class="msg-item" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <div class="msg-item" style="flex-direction:column;align-items:flex-start;gap:6px" data-lead-id="${escHtml(String(sc.id))}" data-lead-source="${escHtml(sc.source)}">
           <div style="display:flex;width:100%;align-items:center;gap:12px">
             <div class="meta" style="flex:1">
               <div class="to">${displayName}${sourceBadge}</div>
@@ -1343,10 +1351,40 @@
             <div style="font-size:0.75em;color:#8b949e;white-space:nowrap">
               from ${escHtml(sc.shared_by_name || sc.shared_by_phone)}
             </div>
+            <button type="button" class="delete-lead-btn" style="background:none;border:1px solid #6e2626;color:#f85149;border-radius:4px;padding:3px 8px;font-size:0.75em;cursor:pointer;flex-shrink:0">Delete</button>
           </div>
           ${ctxHtml ? `<div style="font-size:0.78em;color:#8b949e;width:100%"><span style="color:#6e7681">Context:</span>${ctxHtml}</div>` : ''}
         </div>`;
       }).join('');
+    }
+
+    document.getElementById('leads-list').addEventListener('click', async e => {
+      const btn = e.target.closest('button.delete-lead-btn');
+      if (!btn) return;
+      const item = btn.closest('[data-lead-id]');
+      const id = item.dataset.leadId;
+      const source = item.dataset.leadSource;
+      try {
+        await fetch(`/api/leads/${encodeURIComponent(source)}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Failed to delete lead:', err.message);
+      }
+      refreshLeadsList();
+    });
+
+    async function extractLeadsHistory() {
+      const btn = document.getElementById('leads-extract-btn');
+      btn.disabled = true;
+      btn.textContent = 'Extracting…';
+      try {
+        const result = await fetch('/api/leads/extract', { method: 'POST' }).then(r => r.json());
+        btn.textContent = `Found ${result.found || 0} new`;
+        setTimeout(() => { btn.textContent = 'Extract from History'; btn.disabled = false; }, 3000);
+      } catch {
+        btn.textContent = 'Extract from History';
+        btn.disabled = false;
+      }
+      refreshLeadsList();
     }
 
     // ── Inbox tab ────────────────────────────────────────────────────────

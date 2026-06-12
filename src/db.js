@@ -324,6 +324,8 @@ function createExtractedEmail(email, sharedBy, messageId = null) {
   return result.changes === 0 ? null : result.lastInsertRowid;
 }
 
+// ── Leads helpers ─────────────────────────────────────────────────────────
+
 function deleteExtractedContact(id) {
   const result = getDb().prepare('DELETE FROM extracted_contacts WHERE id = ?').run(id);
   return result.changes;

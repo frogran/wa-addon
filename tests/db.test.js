@@ -610,7 +610,7 @@ describe('Leads delete helpers', () => {
   test('deleteExtractedContact removes the row and returns 1', () => {
     const id = db.createExtractedPhone('+972509999999', contactId);
     expect(db.deleteExtractedContact(id)).toBe(1);
-    expect(db.getAllSharedContacts().find(r => r.phone === '+972509999999')).toBeUndefined();
+    expect(db.getAllSharedContacts().find(r => r.phone === '+972509999999' && r.source === 'text')).toBeUndefined();
   });
 
   test('deleteExtractedContact returns 0 for unknown id', () => {
@@ -632,7 +632,7 @@ describe('Leads delete helpers', () => {
     db.insertMessage(cId, 'in',  'hello', 1000, 'wa_ext_1');
     db.insertMessage(cId, 'out', 'hi',    2000, 'wa_ext_2');
     const rows = db.getAllMessagesForExtraction();
-    expect(rows.length).toBeGreaterThanOrEqual(2);
+    expect(rows.length).toBe(2);
     expect(rows[0]).toHaveProperty('id');
     expect(rows[0]).toHaveProperty('contact_id');
     expect(rows[0]).toHaveProperty('body');

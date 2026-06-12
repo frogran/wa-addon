@@ -1330,7 +1330,7 @@
         return;
       }
       list.innerHTML = rows.map(sc => {
-        const ctx = sc.context_before ? JSON.parse(sc.context_before) : [];
+        const ctx = (() => { try { return JSON.parse(sc.context_before) || []; } catch { return []; } })();
         const ctxHtml = ctx.length
           ? ctx.map(m => `<div class="snippet" dir="auto" style="border-left:2px solid #30363d;padding-left:6px;margin-top:4px">${escHtml(m)}</div>`).join('')
           : '';
@@ -1365,7 +1365,8 @@
       const id = item.dataset.leadId;
       const source = item.dataset.leadSource;
       try {
-        await fetch(`/api/leads/${encodeURIComponent(source)}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        const res = await fetch(`/api/leads/${encodeURIComponent(source)}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!res.ok && res.status !== 404) console.warn('Failed to delete lead:', res.status);
       } catch (err) {
         console.warn('Failed to delete lead:', err.message);
       }

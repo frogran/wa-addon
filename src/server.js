@@ -13,6 +13,7 @@ function createApp() {
   app.use(express.json());
   app.use(express.static(path.join(__dirname, '..', 'public')));
   const replyEngine = require('./reply-engine');
+  const { extractPhones, extractEmails } = require('./extract');
 
   app.get('/api/status', (req, res) => {
     res.json({
@@ -206,6 +207,37 @@ function createApp() {
   // ── Shared contacts ───────────────────────────────────────────────────
   app.get('/api/shared-contacts', (req, res) => {
     res.json(db.getAllSharedContacts());
+  });
+
+  // ── Leads ─────────────────────────────────────────────────────────────
+  app.post('/api/leads/extract', (req, res) => {
+    const messages = db.getAllMessagesForExtraction();
+    let found = 0;
+    for (const msg of messages) {
+      extractPhones(msg.body).forEach(phone => {
+        if (db.createExtractedPhone(phone, msg.contact_id, msg.id)) found++;
+      });
+      extractEmails(msg.body).forEach(email => {
+        if (db.createExtractedEmail(email, msg.contact_id, msg.id)) found++;
+      });
+    }
+    res.json({ ok: true, found });
+  });
+
+  app.delete('/api/leads/:source/:id', (req, res) => {
+    const { source, id } = req.params;
+    const numId = Number(id);
+    if (!Number.isInteger(numId) || numId <= 0) {
+      return res.status(400).json({ error: 'id must be a positive integer' });
+    }
+    if (source !== 'text' && source !== 'vcard') {
+      return res.status(400).json({ error: 'source must be "text" or "vcard"' });
+    }
+    const changed = source === 'text'
+      ? db.deleteExtractedContact(numId)
+      : db.deleteSharedContact(numId);
+    if (!changed) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true });
   });
 
   // ── Chat import ───────────────────────────────────────────────────────

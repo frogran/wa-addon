@@ -269,6 +269,9 @@ describe('shared contacts routes', () => {
     db.init(':memory:');
     app = createApp();
     contactId = db.upsertContact('+972501234567', 'Test Fan');
+    db.getAllMessagesForExtraction = jest.fn().mockReturnValue([]);
+    db.deleteExtractedContact = jest.fn().mockReturnValue(1);
+    db.deleteSharedContact = jest.fn().mockReturnValue(1);
   });
 
   afterEach(() => db.close());
@@ -287,6 +290,67 @@ describe('shared contacts routes', () => {
     expect(res.body[0].phone).toBe('+972509999999');
     expect(res.body[0].name).toBe('New Person');
     expect(res.body[0].shared_by_name).toBe('Test Fan');
+  });
+});
+
+describe('Leads routes', () => {
+  beforeEach(() => {
+    db.init(':memory:');
+    app = createApp();
+    db.getAllMessagesForExtraction = jest.fn().mockReturnValue([]);
+    db.deleteExtractedContact = jest.fn().mockReturnValue(1);
+    db.deleteSharedContact = jest.fn().mockReturnValue(1);
+  });
+
+  afterEach(() => db.close());
+
+  test('POST /api/leads/extract returns ok and found count for messages with phone/email', async () => {
+    db.getAllMessagesForExtraction.mockReturnValue([
+      { id: 1, contact_id: 1, body: 'Call me at +972501234567 or email hi@example.com' }
+    ]);
+    db.createExtractedPhone = jest.fn().mockReturnValue(10);
+    db.createExtractedEmail = jest.fn().mockReturnValue(11);
+    const res = await request(app).post('/api/leads/extract');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.found).toBe(2);
+  });
+
+  test('POST /api/leads/extract returns found=0 when no phones or emails in messages', async () => {
+    db.getAllMessagesForExtraction.mockReturnValue([
+      { id: 2, contact_id: 1, body: 'See you tomorrow!' }
+    ]);
+    db.createExtractedPhone = jest.fn().mockReturnValue(null);
+    db.createExtractedEmail = jest.fn().mockReturnValue(null);
+    const res = await request(app).post('/api/leads/extract');
+    expect(res.status).toBe(200);
+    expect(res.body.found).toBe(0);
+  });
+
+  test('DELETE /api/leads/text/:id deletes from extracted_contacts', async () => {
+    db.deleteExtractedContact.mockReturnValue(1);
+    const res = await request(app).delete('/api/leads/text/5');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(db.deleteExtractedContact).toHaveBeenCalledWith(5);
+  });
+
+  test('DELETE /api/leads/vcard/:id deletes from shared_contacts', async () => {
+    db.deleteSharedContact.mockReturnValue(1);
+    const res = await request(app).delete('/api/leads/vcard/3');
+    expect(res.status).toBe(200);
+    expect(db.deleteSharedContact).toHaveBeenCalledWith(3);
+  });
+
+  test('DELETE /api/leads/text/:id returns 404 when row not found', async () => {
+    db.deleteExtractedContact.mockReturnValue(0);
+    const res = await request(app).delete('/api/leads/text/999');
+    expect(res.status).toBe(404);
+  });
+
+  test('DELETE /api/leads/invalid/1 returns 400 for unknown source', async () => {
+    const res = await request(app).delete('/api/leads/invalid/1');
+    expect(res.status).toBe(400);
   });
 });
 

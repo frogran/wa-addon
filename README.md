@@ -122,3 +122,4 @@ Key tables:
 - **Shared & Extracted Contacts backfill** — text extraction only runs on new messages; existing chat history is not retroactively scanned for phone numbers and emails
 - **Group chats** — group messages are stored under the group ID, not attributed to individual participants
 - **WhatsApp session** — if the session disconnects, restart the server and re-scan the QR code
+- **Messages missed while server is down** — the server only captures messages in real-time while running. A restart reconnects going forward but does not replay missed messages. Run **Scan History** after a restart to backfill messages received or sent while the server was offline

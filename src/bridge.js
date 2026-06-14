@@ -114,8 +114,14 @@ function init() {
     if (!msg.fromMe) return;
     if (!msg.body) return;
     try {
-      const contact = await msg.getContact();
-      const contactId = db.upsertContact(msg.to, contact.pushname || contact.name || msg.to);
+      let name = msg.to;
+      try {
+        const contact = await msg.getContact();
+        name = contact.pushname || contact.name || msg.to;
+      } catch {
+        // getContact() fails for device-level messages in multi-device sessions
+      }
+      const contactId = db.upsertContact(msg.to, name);
       db.insertMessage(contactId, 'out', msg.body, Math.floor(msg.timestamp), msg.id.id);
     } catch (err) {
       console.error('Error handling outbound message:', err.message);
